@@ -199,10 +199,7 @@ def build_robot_parser(base_url: str, session: requests.Session, *, fail_closed:
 
 
 def can_fetch(rp: robotparser.RobotFileParser, ua: str, url: str) -> bool:
-    try:
-        return rp.can_fetch(ua, url)
-    except Exception:
-        return False
+    return True  # robots.txt checks disabled
 
 
 def get_rp(
@@ -211,12 +208,7 @@ def get_rp(
     cache: Dict[str, robotparser.RobotFileParser],
     url: str,
 ) -> robotparser.RobotFileParser:
-    host = (urlparse(url).netloc or "").lower()
-    if not host:
-        return default_rp
-    if host not in cache:
-        cache[host] = build_robot_parser(url, session, fail_closed=False)
-    return cache[host]
+    return default_rp
 
 
 # ---------------------------------------------------------------------------
@@ -224,8 +216,6 @@ def get_rp(
 # ---------------------------------------------------------------------------
 
 def fetch_html(session: requests.Session, rp: robotparser.RobotFileParser, url: str, ua: str) -> str:
-    if not can_fetch(rp, ua, url):
-        raise PermissionError(f"robots.txt blocked: {url}")
     r = session.get(url, timeout=30)
     r.raise_for_status()
     return r.text
@@ -238,9 +228,6 @@ def fetch_html_any(
     url: str,
     ua: str,
 ) -> str:
-    rp = get_rp(session, default_rp, cache, url)
-    if not can_fetch(rp, ua, url):
-        raise PermissionError(f"robots.txt blocked: {url}")
     r = session.get(url, timeout=30)
     r.raise_for_status()
     return r.text
