@@ -1,4 +1,4 @@
-from clip_functions import assign_room_type, identify_default_images, get_score
+from clip_functions.clip_functions import assign_room_type, identify_default_images, get_score
 
 import pathlib
 import pandas as pd
@@ -16,7 +16,7 @@ clip = pipeline(
 
 
 # Get the path of the current folder
-data_path = pathlib.Path.cwd() / "raw_data"
+data_path = pathlib.Path.cwd().parent() / "raw_data"
 
 # import images.csv
 image_df = pd.read_csv(data_path / "images.csv")
