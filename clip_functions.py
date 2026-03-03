@@ -19,7 +19,7 @@ def identify_default_images(image_path: str):
     Output: 1 if DefaultImage, 0 if not DefaultImage
     """
 
-    labels = ["computer generated image", "photograph"]
+    labels = ["illustration or advert", "image"]
     results = clip(image_path, candidate_labels=labels)
 
     if results[0]["label"] == labels[0]:
@@ -30,8 +30,7 @@ def identify_default_images(image_path: str):
     return default_image
 
 
-RoomList = ["kitchen", "bathroom", "living room", "bedroom", "exterior", "storage", "entry", "shop", "floor plan", "something else"]
-def assign_room_type(image_path: str, labels = RoomList):
+def assign_room_type(image_path: str, labels: list):
     """
     Use CLIP to identify the room type of the image.
     Results are list of dictionaries, automatically sorted by decreasing score.
@@ -49,9 +48,7 @@ def assign_room_type(image_path: str, labels = RoomList):
     return (room_type, score)
 
 
-AttributeDict = [{"kitchen": ["luxury", "brightness"],
-                  "bedroom": ["brightness"]}]
-def get_score(image_path: str, room_type: str, attribute_dict = AttributeDict):
+def get_score(image_path: str, room_type: str, attribute_list: list):
     """
     Use CLIP to score the room according to each attribute.
     The list of attributes depends on the room type according to the attribute_dict.
@@ -60,11 +57,19 @@ def get_score(image_path: str, room_type: str, attribute_dict = AttributeDict):
     Input: image path and list of possible room types
     Output: label of room type depicted in the image
     """
-    attribute_list = attribute_dict[room_type]
 
     dict = {}
     for attribute in attribute_list:
-        labels = ["yes "+attribute, "no "+attribute]
+
+        if attribute == "brightness":
+            labels = ["bright", "dark"]
+        elif attribute == "luxury":
+            labels = ["expensive", "cheap"]
+        elif attribute == "modernity":
+            labels = ["modern", "old fashioned"]
+        else:
+            labels = ["yes "+attribute, "no "+attribute]
+
         results = clip(image_path, candidate_labels=labels)
         label = results[0]["label"]
         score = results[0]["score"]
