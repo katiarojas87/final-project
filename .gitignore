@@ -208,6 +208,4 @@ __marimo__/
 
 #webscraper
 raw_data/
-images.csv
-listings.csv
 .DS_Store
