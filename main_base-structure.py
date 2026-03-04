@@ -2,12 +2,9 @@ import pandas as pd
 import pathlib
 from sklearn.compose import ColumnTransformer
 
-from clip_functions.clip_functions import assign_room_type, identify_default_images, get_score, initialize_clip
+from clip_functions.clip_functions import initialize_clip
 from clip_functions.data_clean import data_clean
 from clip_functions.adding_clip_columns import add_clip_columns, average_scoring
-
-# Model selection
-from sklearn.model_selection import train_test_split, cross_val_score
 
 def load_data(path_to_project: str):
     # Get the path of the current folder
