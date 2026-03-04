@@ -62,10 +62,11 @@ def get_score(image_path: str, room_type: str, attribute_list: list, clip):
 
     dict = {}
 
-    if room_type != "floor plan":
+    for attribute in attribute_list:
+        if room_type == "floor plan":
+            dict[attribute] = -1000
 
-        for attribute in attribute_list:
-
+        else:
             if attribute == "brightness":
                 labels = ["bright", "dark"]
             elif attribute == "luxury":
@@ -78,7 +79,8 @@ def get_score(image_path: str, room_type: str, attribute_list: list, clip):
             results = clip(image_path, candidate_labels=labels)
             label = results[0]["label"]
             score = results[0]["score"]
-            if label != "yes "+attribute:
+
+            if label != labels[0]:
                 score = 1-score
 
             dict[attribute] = score
