@@ -10,7 +10,7 @@ def add_clip_columns(df: pd.DataFrame, image_folder: pathlib.PosixPath, room_lis
     Default images are computer generated images.
     Return DataFrame with additional columns.
 
-    Input: DataFrame with column "image_path"
+    Input: DataFrame with column "image_name"
     Output: DataFrame with additional columns "default_image", "room_type", "scoring_dict"
     """
 
@@ -39,9 +39,39 @@ def add_clip_columns(df: pd.DataFrame, image_folder: pathlib.PosixPath, room_lis
 
     # add column scoring_dict
     df["scoring_dict"] = df.apply(lambda x: \
-        get_score(x["image_path"], str(x["room_type"][0]), attribute_list, clip), \
+        get_score(x["image_path"], x["room_type"], attribute_list, clip), \
             axis=1)
 
     print("added scoring dict column")
 
     return df
+
+
+def average_scoring(df, attribute_list):
+    """
+    Sometimes, several pictures of the same room type are given.
+    Compute average score for each room type in a listing.
+    Return a DataFrame with 1 row per listing and columns for each attribute and room_type.
+
+    Input: DataFrame 1 row per image
+    Output: DataFrame 1 row per listing
+    """
+
+    mean_score = df.groupby(['source_id', 'room_type'])[attribute_list[0]].mean().reset_index()
+    if len(attribute_list) > 1:
+        for attribute in attribute_list[1:]:
+            group_average = df.groupby(['source_id', 'room_type'])[attribute].mean().reset_index()[attribute]
+            mean_score = mean_score.join(group_average)
+
+    # pivot wider
+    df_wide = mean_score.pivot(index="source_id", columns="room_type")
+
+    # flatten MultiIndex columns -> luxury_bedroom, brightness_kitchen, etc.
+    df_wide.columns = [
+        f"{metric}_{room}".replace(" ", "_")
+        for metric, room in df_wide.columns
+    ]
+
+    df_wide.drop(columns=[attribute + "_floor_plan" for attribute in attribute_list])
+
+    return df_wide.reset_index()
