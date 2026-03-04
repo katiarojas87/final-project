@@ -6,7 +6,6 @@ from clip_functions.clip_functions import initialize_clip
 from clip_functions.data_clean import data_clean
 from clip_functions.adding_clip_columns import add_clip_columns, average_scoring
 
-
 def load_data(path_to_project: str):
     # Get the path of the current folder
     data_path = pathlib.Path(path_to_project) / "raw_data"
