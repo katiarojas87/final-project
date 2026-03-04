@@ -13,6 +13,7 @@ def add_clip_columns(df: pd.DataFrame, image_folder: pathlib.PosixPath, room_lis
     Input: DataFrame with column "image_name"
     Output: DataFrame with additional columns "default_image", "room_type", "scoring_dict"
     """
+    print("start", df.head(), len(df))
 
     df["image_path"] = df["image_name"].apply(lambda x: \
         str(image_folder / str(x).split("_")[0] / x))
@@ -25,6 +26,15 @@ def add_clip_columns(df: pd.DataFrame, image_folder: pathlib.PosixPath, room_lis
     df = df[df["default_image"] != 2]\
         .reset_index().drop(columns="index")
 
+    print("remove default", df.head(), len(df))
+
+    # remove listings if <5 pictures
+    source_id_count = pd.DataFrame(df['source_id'].value_counts()).reset_index()
+    source_ids = source_id_count[source_id_count["count"]>=5]["source_id"]
+    df = df[df['source_id'].isin(source_ids)]\
+        .reset_index().drop(columns="index")
+
+    print("remove if <5",df.head(), len(df))
     print("added default column")
 
     # add column room_type
@@ -35,6 +45,15 @@ def add_clip_columns(df: pd.DataFrame, image_folder: pathlib.PosixPath, room_lis
     df = df[df["room_type"].isin(["kitchen", "bathroom", "toilet", "living room", "bedroom", "floor plan"])]\
         .reset_index().drop(columns="index")
 
+    print("added room type",df.head(), len(df))
+
+    # remove listings if <5 pictures
+    source_id_count = pd.DataFrame(df['source_id'].value_counts()).reset_index()
+    source_ids = source_id_count[source_id_count["count"]>=5]["source_id"]
+    df = df[df['source_id'].isin(source_ids)]\
+        .reset_index().drop(columns="index")
+
+    print("remove if <5",df.head(), len(df))
     print("added room type column")
 
     # add column scoring_dict

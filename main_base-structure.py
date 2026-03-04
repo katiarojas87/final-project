@@ -17,14 +17,14 @@ def load_data(path_to_project: str):
     listings_df = pd.read_csv(data_path / "listings.csv")
 
     # TEMPORARY!!!
-    listings_df = listings_df[0:30]\
+    listings_df = listings_df[0:10]\
         .reset_index().drop(columns="index")
     source_id = listings_df["source_id"]
     image_df = image_df[image_df["source_id"].isin(source_id)]\
         .reset_index().drop(columns="index")
 
     # run data cleaning function
-    listings_df, image_df = data_clean(listings_df, image_df)
+    #listings_df, image_df = data_clean(listings_df, image_df)
 
     # define room list and attribute dict
     RoomList = ["kitchen", "bathroom", "toilet", "living room", "bedroom", "walk-in closet", "closet", "entry inside", "exterior", "shop", "floor plan", "control panel", "entry outside"]
@@ -32,6 +32,8 @@ def load_data(path_to_project: str):
 
     # initialize clip
     clip = initialize_clip()
+
+    print("files imported, listings cleaned, clip initialized")
 
     # add columns and remove unwanted images
     image_df = add_clip_columns(df = image_df,
@@ -42,8 +44,8 @@ def load_data(path_to_project: str):
 
     # remove listings if <5 pictures
     source_id_count = pd.DataFrame(image_df['source_id'].value_counts()).reset_index()
-    source_ids = source_id_count[source_id_count["count"]>=5]
-    listing_df = listing_df[listing_df['source_id'].isin(source_ids)]\
+    source_ids = source_id_count[source_id_count["count"]>=5]["source_id"]
+    listings_df = listings_df[listings_df['source_id'].isin(source_ids)]\
         .reset_index().drop(columns="index")
     image_df = image_df[image_df['source_id'].isin(source_ids)]\
         .reset_index().drop(columns="index")
@@ -58,11 +60,13 @@ def load_data(path_to_project: str):
 
     # compute average score per room type and listing
     average_scores = average_scoring(image_df, AttributeList)
+    print("average scores computed")
 
-    # merge listings to include average scores and room type (TO BE FINISHED)
+    # merge listings to include average scores per room type
     listings_df.join(average_scores)
 
     listings_df.to_csv("listings_with_scores.csv")
+    print("listings_with_scores.csv saved")
 
     return listings_df
 
