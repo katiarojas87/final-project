@@ -21,10 +21,12 @@ def identify_default_images(image_path: str, clip):
     Output: 1 if DefaultImage, 0 if not DefaultImage
     """
 
-    labels = ["illustration, logo or advert", "image"]
+    labels = ["illustration, logo or advert", "floor plan", "image"]
     results = clip(image_path, candidate_labels=labels)
 
     if results[0]["label"] == labels[0]:
+        default_image = 2
+    elif results[0]["label"] == labels[1]:
         default_image = 1
     else:
         default_image = 0
@@ -59,23 +61,26 @@ def get_score(image_path: str, room_type: str, attribute_list: list, clip):
     """
 
     dict = {}
-    for attribute in attribute_list:
 
-        if attribute == "brightness":
-            labels = ["bright", "dark"]
-        elif attribute == "luxury":
-            labels = ["expensive", "cheap"]
-        elif attribute == "modernity":
-            labels = ["modern", "old fashioned"]
-        else:
-            labels = ["yes "+attribute, "no "+attribute]
+    if room_type != "floor plan":
 
-        results = clip(image_path, candidate_labels=labels)
-        label = results[0]["label"]
-        score = results[0]["score"]
-        if label != "yes "+attribute:
-            score = 1-score
+        for attribute in attribute_list:
 
-        dict[attribute] = score
+            if attribute == "brightness":
+                labels = ["bright", "dark"]
+            elif attribute == "luxury":
+                labels = ["expensive", "cheap"]
+            elif attribute == "modernity":
+                labels = ["modern", "old fashioned"]
+            else:
+                labels = ["yes "+attribute, "no "+attribute]
+
+            results = clip(image_path, candidate_labels=labels)
+            label = results[0]["label"]
+            score = results[0]["score"]
+            if label != "yes "+attribute:
+                score = 1-score
+
+            dict[attribute] = score
 
     return dict

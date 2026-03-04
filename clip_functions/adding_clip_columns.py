@@ -21,8 +21,8 @@ def add_clip_columns(df: pd.DataFrame, image_folder: pathlib.PosixPath, room_lis
     df["default_image"] = df["image_path"].apply(lambda x: \
         identify_default_images(x, clip))
 
-    # remove default images, i.e. only keep if not default image
-    df = df[df["default_image"] == 0]\
+    # remove illustations/logos/adverts, but keep floor plans and images
+    df = df[df["default_image"] != 2]\
         .reset_index().drop(columns="index")
 
     print("added default column")
@@ -32,7 +32,7 @@ def add_clip_columns(df: pd.DataFrame, image_folder: pathlib.PosixPath, room_lis
         assign_room_type(x, room_list, clip))
 
     # remove unnecessary images, e.g. exteriors, stores, floor plans
-    df = df[df["room_type"].isin(["kitchen", "bathroom", "toilet", "living room", "bedroom"])]\
+    df = df[df["room_type"].isin(["kitchen", "bathroom", "toilet", "living room", "bedroom", "floor plan"])]\
         .reset_index().drop(columns="index")
 
     print("added room type column")
