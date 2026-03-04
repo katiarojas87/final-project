@@ -1,31 +1,10 @@
-from clip_functions.clip_functions import assign_room_type, identify_default_images, get_score
+from clip_functions.clip_functions import initialize_clip, assign_room_type, identify_default_images, get_score
 
 import pathlib
 import pandas as pd
 
-import torch
-from transformers import pipeline
 
-
-clip = pipeline(
-    task = "zero-shot-image-classification",
-    model = "openai/clip-vit-base-patch32",
-    dtype = torch.bfloat16,
-    device=0
-)
-
-
-# Get the path of the current folder
-data_path = pathlib.Path.cwd().parent() / "raw_data"
-
-# import images.csv
-image_df = pd.read_csv(data_path / "images.csv")
-
-# define room list and attribute dict
-RoomList = ["kitchen", "bathroom", "living room", "bedroom", "storage", "exterior", "entry", "shop", "floor plan", "control panel", "something else"]
-AttributeList = ["luxury", "brightness", "modernity"]
-
-def add_clip_columns(df: pd.DataFrame, image_folder: pathlib.PosixPath = data_path / "suumo_images", room_list: list = RoomList, attribute_list: list = AttributeList):
+def add_clip_columns(df: pd.DataFrame, image_folder: pathlib.PosixPath, room_list: list, attribute_list: list, clip):
     """
     Use CLIP functions to add columns to data frame.
     Default images are computer generated images.
@@ -36,16 +15,33 @@ def add_clip_columns(df: pd.DataFrame, image_folder: pathlib.PosixPath = data_pa
     """
 
     df["image_path"] = df["image_name"].apply(lambda x: \
-        identify_default_images(str(image_folder / str(x).split("_")[0] / x)))
+        str(image_folder / str(x).split("_")[0] / x))
 
+    # add column default_image
     df["default_image"] = df["image_path"].apply(lambda x: \
-        identify_default_images(x))
+        identify_default_images(x, clip))
 
+    # remove illustations/logos/adverts, but keep floor plans and images
+    df = df[df["default_image"] != 2]\
+        .reset_index().drop(columns="index")
+
+    print("added default column")
+
+    # add column room_type
     df["room_type"] = df["image_path"].apply(lambda x: \
-        assign_room_type(x, RoomList))
+        assign_room_type(x, room_list, clip))
 
+    # remove unnecessary images, e.g. exteriors, stores, floor plans
+    df = df[df["room_type"].isin(["kitchen", "bathroom", "toilet", "living room", "bedroom", "floor plan"])]\
+        .reset_index().drop(columns="index")
+
+    print("added room type column")
+
+    # add column scoring_dict
     df["scoring_dict"] = df.apply(lambda x: \
-        get_score(x["image_path"], str(x["room_type"][0]), AttributeList), \
+        get_score(x["image_path"], str(x["room_type"][0]), attribute_list, clip), \
             axis=1)
+
+    print("added scoring dict column")
 
     return df
