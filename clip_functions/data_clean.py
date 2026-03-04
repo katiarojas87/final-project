@@ -15,5 +15,13 @@ def data_clean(listing_data, images_data):
     images_data = images_data.dropna()
     listing_data = listing_data[listing_data['image_count'] >= 5]
     images_data = images_data[images_data['source_id'].isin(listing_data['source_id'])]
+    listing_data.apply(fix_floating, axis=1)
 
     return listing_data, images_data
+
+#Function to replace floating apartments
+def fix_floating(row):
+    if row['floor_number'] > row['floors_total']:
+        row['floors_total'] = row['floor_number'] * 2
+
+    return row
