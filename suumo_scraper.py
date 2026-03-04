@@ -8,7 +8,7 @@ import random
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from threading import local
+from threading import Lock, local
 from urllib.parse import unquote, urljoin, urlparse
 
 import requests
@@ -30,6 +30,7 @@ URL = (
 OUTPUT_DIR = "raw_data/"
 LISTINGS_CSV = os.path.join(OUTPUT_DIR, "listings.csv")
 IMAGES_CSV = os.path.join(OUTPUT_DIR, "images.csv")
+FAILED_LISTINGS_CSV = os.path.join(OUTPUT_DIR, "failed_listings.csv")
 IMAGE_ROOT = os.path.join("raw_data", "suumo_images")
 
 LISTINGS_COLUMNS = [
@@ -47,6 +48,7 @@ LISTINGS_COLUMNS = [
     "image_count",
 ]
 IMAGES_COLUMNS = ["source_id", "listing_url", "image_url", "image_name"]
+FAILED_LISTINGS_COLUMNS = ["source_id", "listing_url", "attempts", "last_reason", "last_error_at"]
 
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -54,10 +56,16 @@ USER_AGENT = (
     "Chrome/122.0.0.0 Safari/537.36"
 )
 
-DELAY_SECONDS = 2.0
+DELAY_SECONDS = 1.0
 MAX_WORKERS = 1
-MAX_LISTINGS = 1000
+MAX_LISTINGS = 22000
 MAX_IMAGE_PROBE_URLS = 0
+MIN_IMAGES_PER_LISTING = 2
+MAX_FAILED_LISTING_ATTEMPTS = 5
+FAILED_RETRY_BATCH = 20
+COOLDOWN_503_THRESHOLD = 3
+COOLDOWN_SECONDS = 300
+MAX_DELAY_SECONDS = 5.0
 RETRY_STATUS_CODES = {429, 500, 502, 503, 504}
 RETRY_ATTEMPTS = 6
 RETRY_BASE_SLEEP_SECONDS = 2.5
@@ -93,6 +101,8 @@ SUUMO_MEDIA_PATH_HINTS = (
     "/media/",
 )
 _THREAD_LOCAL = local()
+_REQUEST_STATS_LOCK = Lock()
+_REQUEST_STATS = {"responses": 0, "status_503": 0, "status_429": 0}
 
 
 def norm_ws(text):
@@ -168,13 +178,21 @@ def append_rows(path, columns, rows):
         csv.DictWriter(f, fieldnames=columns).writerows(rows)
 
 
+def _int_or_default(raw, default=0):
+    try:
+        return int(raw)
+    except Exception:
+        return default
+
+
 def load_existing_source_ids():
     out = set()
     if os.path.exists(LISTINGS_CSV):
         with open(LISTINGS_CSV, newline="", encoding="utf-8") as f:
             for row in csv.DictReader(f):
                 sid = (row.get("source_id") or "").strip()
-                if sid:
+                image_count = _int_or_default((row.get("image_count") or "").strip(), 0)
+                if sid and image_count >= MIN_IMAGES_PER_LISTING:
                     out.add(sid)
     return out
 
@@ -189,6 +207,71 @@ def load_existing_image_keys():
                 if sid and image_url:
                     out.add((sid, image_url))
     return out
+
+
+def load_failed_listings():
+    out = {}
+    if not os.path.exists(FAILED_LISTINGS_CSV):
+        return out
+    with open(FAILED_LISTINGS_CSV, newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            sid = (row.get("source_id") or "").strip()
+            listing_url = (row.get("listing_url") or "").strip()
+            if not sid and listing_url:
+                sid = source_id(listing_url)
+            if not sid or not listing_url:
+                continue
+            attempts = _int_or_default((row.get("attempts") or "").strip(), 1)
+            out[sid] = {
+                "source_id": sid,
+                "listing_url": listing_url,
+                "attempts": max(1, attempts),
+                "last_reason": (row.get("last_reason") or "").strip(),
+                "last_error_at": (row.get("last_error_at") or "").strip(),
+            }
+    return out
+
+
+def save_failed_listings(failed_by_sid):
+    rows = sorted(
+        failed_by_sid.values(),
+        key=lambda r: (-_int_or_default(r.get("attempts", 0), 0), r.get("source_id", "")),
+    )
+    with open(FAILED_LISTINGS_CSV, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=FAILED_LISTINGS_COLUMNS)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def mark_listing_failed(failed_by_sid, sid, listing_url, reason):
+    now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    prev = failed_by_sid.get(sid)
+    attempts = (prev.get("attempts", 0) if prev else 0) + 1
+    failed_by_sid[sid] = {
+        "source_id": sid,
+        "listing_url": listing_url,
+        "attempts": attempts,
+        "last_reason": (reason or "")[:240],
+        "last_error_at": now,
+    }
+
+
+def _record_response_status(status_code):
+    with _REQUEST_STATS_LOCK:
+        _REQUEST_STATS["responses"] += 1
+        if status_code == 503:
+            _REQUEST_STATS["status_503"] += 1
+        if status_code == 429:
+            _REQUEST_STATS["status_429"] += 1
+
+
+def _status_count(code):
+    with _REQUEST_STATS_LOCK:
+        if code == 503:
+            return _REQUEST_STATS["status_503"]
+        if code == 429:
+            return _REQUEST_STATS["status_429"]
+        return _REQUEST_STATS["responses"]
 
 
 def build_session():
@@ -217,6 +300,7 @@ def fetch_html(session, url, attempts=RETRY_ATTEMPTS, base_sleep=RETRY_BASE_SLEE
     for attempt in range(1, attempts + 1):
         try:
             r = session.get(url, timeout=30)
+            _record_response_status(r.status_code)
 
             if r.status_code in RETRY_STATUS_CODES:
                 if attempt >= attempts:
@@ -333,8 +417,29 @@ def parse_layout(raw):
 
 def parse_area(raw):
     s = norm_num(norm_ws(raw))
-    m = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*(?:m\^\{2\}|m2|m²|㎡|平米)", s, re.I)
-    return float(m.group(1)) if m else None
+    if not s:
+        return None
+
+    # Prefer explicit area units.
+    m = re.search(
+        r"([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]+)?)\s*(?:m\^\{2\}|m2|m²|㎡|平米)",
+        s,
+        re.I,
+    )
+    if m:
+        return float(m.group(1).replace(",", ""))
+
+    # Fallback: value may be plain number under a 専有面積 label.
+    m = re.search(r"([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]+)?)", s)
+    if not m:
+        return None
+    try:
+        v = float(m.group(1).replace(",", ""))
+    except ValueError:
+        return None
+    if 10.0 <= v <= 500.0:
+        return v
+    return None
 
 
 def parse_year(raw):
@@ -391,10 +496,10 @@ def parse_listing_fields(soup):
         )
         layout_raw = m.group(1) if m else ""
 
-    area_raw = first_value(pairs, "専有面積")
+    area_raw = first_value(pairs, "専有面積", "専有面積（壁芯）", "専有面積(壁芯)", "壁芯")
     if not area_raw:
         m = re.search(
-            r"専有面積[^0-9０-９]{0,20}([0-9０-９,，\.．]+\s*(?:m\^\{2\}|m2|m²|㎡|平米))",
+            r"専有面積[^0-9０-９]{0,80}([0-9０-９,，\.．]+\s*(?:m\^\{2\}|m2|m²|㎡|平米))",
             text_flat,
             re.IGNORECASE,
         )
@@ -694,14 +799,31 @@ def format_elapsed(start_ts):
 
 def scrape_listing(listing_url, existing_image_keys_snapshot):
     session = worker_session()
-    html = fetch_html(session, listing_url)
-    soup = make_soup(html)
-
     sid = source_id(listing_url)
-    fields = parse_listing_fields(soup)
-    image_urls = collect_all_image_urls(
-        session, listing_url, html, sid, max_probe_urls=MAX_IMAGE_PROBE_URLS
-    )
+
+    try:
+        html = fetch_html(session, listing_url)
+    except Exception as exc:
+        return {
+            "status": "failed",
+            "source_id": sid,
+            "listing_url": listing_url,
+            "reason": f"fetch_failed:{type(exc).__name__}",
+        }
+
+    try:
+        soup = make_soup(html)
+        fields = parse_listing_fields(soup)
+        image_urls = collect_all_image_urls(
+            session, listing_url, html, sid, max_probe_urls=MAX_IMAGE_PROBE_URLS
+        )
+    except Exception as exc:
+        return {
+            "status": "failed",
+            "source_id": sid,
+            "listing_url": listing_url,
+            "reason": f"parse_failed:{type(exc).__name__}",
+        }
 
     listing_image_dir = os.path.join(IMAGE_ROOT, sid)
     os.makedirs(listing_image_dir, exist_ok=True)
@@ -743,7 +865,22 @@ def scrape_listing(listing_url, existing_image_keys_snapshot):
         "walk_minutes": fields["walk_minutes"],
         "image_count": image_count,
     }
-    return listing_row, image_rows
+
+    if image_count < MIN_IMAGES_PER_LISTING:
+        return {
+            "status": "low_quality",
+            "source_id": sid,
+            "listing_url": listing_url,
+            "reason": f"low_images:{image_count}",
+        }
+
+    return {
+        "status": "ok",
+        "source_id": sid,
+        "listing_url": listing_url,
+        "listing_row": listing_row,
+        "image_rows": image_rows,
+    }
 
 
 def crawl():
@@ -751,53 +888,116 @@ def crawl():
     os.makedirs(IMAGE_ROOT, exist_ok=True)
     ensure_csv(LISTINGS_CSV, LISTINGS_COLUMNS)
     ensure_csv(IMAGES_CSV, IMAGES_COLUMNS)
+    ensure_csv(FAILED_LISTINGS_CSV, FAILED_LISTINGS_COLUMNS)
 
     existing_source_ids = load_existing_source_ids()
     existing_image_keys = load_existing_image_keys()
+    failed_by_sid = load_failed_listings()
 
     page_session = build_session()
     current = URL
     page_num = 0
     scraped_this_run = 0
     images_added_this_run = 0
+    failed_this_run = 0
+    current_delay = DELAY_SECONDS
+    consecutive_page_failures = 0
     started_at = time.time()
 
-    print(f"[start] target={MAX_LISTINGS} listings, workers={MAX_WORKERS}")
+    print(
+        f"[start] target={MAX_LISTINGS} listings, workers={MAX_WORKERS}, "
+        f"min_images={MIN_IMAGES_PER_LISTING}, retry_queue={len(failed_by_sid)}"
+    )
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
         while current and scraped_this_run < MAX_LISTINGS:
             page_num += 1
             print(f"[page {page_num}] fetching results page (elapsed {format_elapsed(started_at)})")
+            page_503_before = _status_count(503)
             try:
                 html = fetch_html(page_session, current, attempts=max(RETRY_ATTEMPTS, 6), base_sleep=1.5)
             except Exception as exc:
                 print(f"[page {page_num}] failed after retries: {exc}")
-                print("[stop] ending run early; rerun later to continue.")
-                break
+                consecutive_page_failures += 1
+                if consecutive_page_failures >= 3:
+                    print("[stop] too many consecutive page failures; rerun later to continue.")
+                    break
+                cool_s = COOLDOWN_SECONDS
+                print(f"[cooldown] sleeping {cool_s}s before retrying same page.")
+                time.sleep(cool_s)
+                page_num -= 1
+                continue
+            consecutive_page_failures = 0
             soup = make_soup(html)
 
-            candidates = [u for u in detail_links(soup, current) if source_id(u) not in existing_source_ids]
             remaining = MAX_LISTINGS - scraped_this_run
             if remaining <= 0:
                 break
-            candidates = candidates[:remaining]
-            print(f"[page {page_num}] candidates={len(candidates)} remaining_target={remaining}")
+
+            retry_urls = []
+            for row in sorted(failed_by_sid.values(), key=lambda r: r.get("attempts", 0)):
+                sid = (row.get("source_id") or "").strip()
+                listing_url = (row.get("listing_url") or "").strip()
+                attempts = _int_or_default(row.get("attempts"), 0)
+                if not sid or not listing_url:
+                    continue
+                if sid in existing_source_ids:
+                    continue
+                if attempts >= MAX_FAILED_LISTING_ATTEMPTS:
+                    continue
+                retry_urls.append(listing_url)
+                if len(retry_urls) >= min(FAILED_RETRY_BATCH, remaining):
+                    break
+
+            fresh_urls = []
+            retry_seen = set(retry_urls)
+            for u in detail_links(soup, current):
+                sid = source_id(u)
+                if sid in existing_source_ids:
+                    continue
+                if u in retry_seen:
+                    continue
+                fresh_urls.append(u)
+
+            candidates = (retry_urls + fresh_urls)[:remaining]
+            print(
+                f"[page {page_num}] candidates={len(candidates)} "
+                f"(retry={len(retry_urls)}, fresh={len(fresh_urls)}) remaining_target={remaining}"
+            )
             existing_image_keys_snapshot = set(existing_image_keys)
 
             listing_rows = []
             image_rows = []
 
-            futures = [pool.submit(scrape_listing, url, existing_image_keys_snapshot) for url in candidates]
+            futures = {pool.submit(scrape_listing, url, existing_image_keys_snapshot): url for url in candidates}
             for fut in as_completed(futures):
+                listing_url = futures[fut]
+                sid = source_id(listing_url)
                 try:
-                    listing_row, scraped_image_rows = fut.result()
-                except Exception:
+                    result = fut.result()
+                except Exception as exc:
+                    mark_listing_failed(failed_by_sid, sid, listing_url, f"worker_failed:{type(exc).__name__}")
+                    failed_this_run += 1
                     continue
 
-                sid = listing_row["source_id"]
+                status = result.get("status")
+                if status != "ok":
+                    mark_listing_failed(
+                        failed_by_sid,
+                        sid,
+                        listing_url,
+                        result.get("reason", "failed"),
+                    )
+                    failed_this_run += 1
+                    continue
+
                 if sid in existing_source_ids:
                     continue
+
+                listing_row = result["listing_row"]
+                scraped_image_rows = result["image_rows"]
                 existing_source_ids.add(sid)
+                failed_by_sid.pop(sid, None)
                 listing_rows.append(listing_row)
                 scraped_this_run += 1
 
@@ -816,17 +1016,32 @@ def crawl():
 
             append_rows(LISTINGS_CSV, LISTINGS_COLUMNS, listing_rows)
             append_rows(IMAGES_CSV, IMAGES_COLUMNS, image_rows)
+            save_failed_listings(failed_by_sid)
+
+            page_503_after = _status_count(503)
+            page_503_delta = page_503_after - page_503_before
+            if page_503_delta >= COOLDOWN_503_THRESHOLD:
+                current_delay = min(MAX_DELAY_SECONDS, max(current_delay * 1.5, DELAY_SECONDS))
+                print(
+                    f"[cooldown] detected {page_503_delta}x 503 on page {page_num}; "
+                    f"sleeping {COOLDOWN_SECONDS}s and raising delay to {current_delay:.1f}s"
+                )
+                time.sleep(COOLDOWN_SECONDS)
+            elif page_503_delta == 0 and current_delay > DELAY_SECONDS:
+                current_delay = max(DELAY_SECONDS, current_delay * 0.9)
 
             if scraped_this_run >= MAX_LISTINGS:
                 break
 
             current = next_page(soup, current)
-            if current and DELAY_SECONDS > 0:
-                time.sleep(DELAY_SECONDS)
+            if current and current_delay > 0:
+                time.sleep(current_delay)
+
+    save_failed_listings(failed_by_sid)
 
     print(
-        f"[done] listings={scraped_this_run} images={images_added_this_run} "
-        f"elapsed={format_elapsed(started_at)} pages={page_num}"
+        f"[done] listings={scraped_this_run} images={images_added_this_run} failed={failed_this_run} "
+        f"queued_failures={len(failed_by_sid)} elapsed={format_elapsed(started_at)} pages={page_num}"
     )
 
 
