@@ -1,7 +1,7 @@
 import pandas as pd
 import pathlib
 from preprocess import data_clean
-from clip_functions.adding_clip_columns import add_clip_columns
+from clip_functions.adding_clip_columns import add_clip_columns, average_scoring
 from clip_functions.clip_functions import initialize_clip
 
 def load_data(path_to_project: str):
@@ -10,15 +10,19 @@ def load_data(path_to_project: str):
 
     # import images.csv
     image_df = pd.read_csv(data_path / "images.csv")
-    image_df = image_df[0:30]
 
-    # import listings.csv (TO BE FINISHED)
+    # import listings.csv
     listings_df = pd.read_csv(data_path / "listings.csv")
-    listings_df = listings_df[0:30]
 
-    # run lance data cleaning functions (TO BE FINISHED)
+    # TEMPORARY!!!
+    listings_df = listings_df[0:30]\
+        .reset_index().drop(columns="index")
+    source_id = listings_df["source_id"]
+    image_df = image_df[image_df["source_id"].isin(source_id)]\
+        .reset_index().drop(columns="index")
+
+    # run data cleaning function
     listings_df, image_df = data_clean(listings_df, image_df)
-
 
     # define room list and attribute dict
     RoomList = ["kitchen", "bathroom", "toilet", "living room", "bedroom", "walk-in closet", "closet", "entry inside", "exterior", "shop", "floor plan", "control panel", "entry outside"]
@@ -34,13 +38,29 @@ def load_data(path_to_project: str):
                                 attribute_list = AttributeList,
                                 clip = clip)
 
+    # remove listings if <5 pictures
+    source_id_count = pd.DataFrame(image_df['source_id'].value_counts()).reset_index()
+    source_ids = source_id_count[source_id_count["count"]>=5]
+    listing_df = listing_df[listing_df['source_id'].isin(source_ids)]\
+        .reset_index().drop(columns="index")
+    image_df = image_df[image_df['source_id'].isin(source_ids)]\
+        .reset_index().drop(columns="index")
+
     # save csv
     image_df.to_csv("images_cleaned.csv")
     listings_df.to_csv("listings_cleaned.csv")
 
-    # merge listings to include scores and room type (TO BE FINISHED)
-    #intermediary step
-    listings_df.merge(image_df)
+    # scoring dict into column for each attribute
+    details_df = pd.json_normalize(image_df['scoring_dict'])
+    image_df = image_df.join(details_df)
+
+    # compute average score per room type and listing
+    average_scores = average_scoring(image_df, AttributeList)
+
+    # merge listings to include average scores and room type (TO BE FINISHED)
+    listings_df.join(average_scores)
+
+    listings_df.to_csv("listings_with_scores.csv")
 
     return listings_df
 

@@ -72,4 +72,6 @@ def average_scoring(df, attribute_list):
         for metric, room in df_wide.columns
     ]
 
+    df_wide.drop(columns=[attribute + "_floor_plan" for attribute in attribute_list])
+
     return df_wide.reset_index()
