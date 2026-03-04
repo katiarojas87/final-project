@@ -1,6 +1,6 @@
 import pandas as pd
 import pathlib
-
+from preprocess import data_clean
 from clip_functions.adding_clip_columns import add_clip_columns
 from clip_functions.clip_functions import initialize_clip
 
@@ -13,10 +13,11 @@ def load_data(path_to_project: str):
     image_df = image_df[0:30]
 
     # import listings.csv (TO BE FINISHED)
-    listings_df = "..."
+    listings_df = pd.read_csv(data_path / "listings.csv")
+    listings_df = listings_df[0:30]
 
     # run lance data cleaning functions (TO BE FINISHED)
-
+    listings_df, image_df = data_clean(listings_df, image_df)
 
 
     # define room list and attribute dict
@@ -38,6 +39,7 @@ def load_data(path_to_project: str):
     listings_df.to_csv("listings_cleaned.csv")
 
     # merge listings to include scores and room type (TO BE FINISHED)
+    #intermediary step
     listings_df.merge(image_df)
 
     return listings_df
