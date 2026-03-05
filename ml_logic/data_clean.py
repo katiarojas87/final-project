@@ -1,5 +1,5 @@
 """
-This script cleans the raw listings and images before clip does
+This script cleans the raw listings and images and adds tags to images using images
 """
 import pathlib
 import pandas as pd
@@ -7,6 +7,43 @@ import numpy as np
 import matplotlib as mlpt
 import torch
 from transformers import pipeline
+import re
+
+_layout_re = re.compile(r"^\s*(\d+)\s*(S?)\s*(LDK|DK|K|R)\s*$", re.IGNORECASE)
+
+_fw_digits = str.maketrans("０１２３４５６７８９", "0123456789")
+
+def parse_layout(X):
+    """
+    Input: X as 2D array (n_samples, 1) containing layout strings
+    Output: DataFrame with columns:
+      - rooms_num (int)
+      - base_layout (str: LDK/DK/K/R)
+      - has_S (int 0/1)
+    """
+    s = pd.Series(np.asarray(X).ravel()).fillna("").astype(str)
+    s = s.str.translate(_fw_digits).str.strip().str.upper()
+
+    rooms = []
+    base = []
+    has_s = []
+
+    for val in s:
+        m = _layout_re.match(val)
+        if not m:
+            rooms.append(np.nan)
+            base.append("UNKNOWN")
+            has_s.append(0)
+        else:
+            rooms.append(int(m.group(1)))
+            has_s.append(1 if m.group(2) == "S" else 0)
+            base.append(m.group(3))  # LDK/DK/K/R
+
+    return pd.DataFrame({
+        "rooms_num": rooms,
+        "base_layout": base,
+        "has_S": has_s
+    })
 
 def initialize_clip():
     clip = pipeline(
@@ -29,6 +66,12 @@ def data_clean(listing_data, images_data):
     images_data = images_data[images_data['source_id'].isin(listing_data['source_id'])]
     listing_data.apply(fix_floating, axis=1)
 
+    layout = listing_data['layout']
+    layout_parsed = parse_layout(layout)
+    layout_parsed['has_S'].value_counts()
+    layout_parsed = layout_parsed.drop(['has_S'], axis= 1)
+    listing_data = listing_data.reset_index().join(layout_parsed).drop(['layout'], axis=1)
+
     return listing_data, images_data
 
 #Function to replace floating apartments
@@ -37,7 +80,6 @@ def fix_floating(row):
         row['floors_total'] = row['floor_number'] * 2
 
     return row
-
 
 
 def identify_default_images(image_path: str, clip):

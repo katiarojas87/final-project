@@ -66,7 +66,7 @@ def preprocess_features(X):
     This function creates a preprocessor pipeline and returns X_processed.
     """
     def create_sklearn_preprocessor() -> ColumnTransformer:
-        num_features = ["price_man_yen","area_sqm","year_built","floor_number","floors_total","walk_minutes"]
+        num_features = ["area_sqm","year_built","floor_number","floors_total","walk_minutes"]
 
         num_transformer = Pipeline ([
             # ("imputer", SimpleImputer(strategy="mean")), #Missing values, normally distributed
@@ -76,7 +76,6 @@ def preprocess_features(X):
         ])
 
         layout_pipe = Pipeline([
-            ("parse", layout_parser),
             ("encode", ColumnTransformer(
                 transformers=[
                     # ordinal numeric feature (ordered)
@@ -86,26 +85,26 @@ def preprocess_features(X):
 
                     # one-hot for the letter type
                     ("base_layout", OneHotEncoder(handle_unknown="ignore", sparse_output=False), ["base_layout"]),
-
-                    # binary flag (0/1) - keep as-is
-                    ("has_S", "passthrough", ["has_S"]),
                 ],
-                remainder="drop"
+                remainder="passthrough"
             ))
         ])
 
-        cat_features = ["address","nearest_station"]
+        # cat_features = ["address"] this is unused yet.
 
-        cat_transformer = Pipeline ([
-            ("ohe", OneHotEncoder(drop = "if_binary",handle_unknown="ignore")), #Nominal data (no order) e.g. region, room_type
-            ("ordinal_encoder", OrdinalEncoder()), #Ordered categories e.g. small < medium < large
-            ("imputer", SimpleImputer(strategy="most_frequent")) #Missing categorical values
+        station_pipe = Pipeline([
+            ("ohe", OneHotEncoder(
+                handle_unknown="ignore",
+                min_frequency=15,        # ✅ tune this (10/20/50 depending on dataset size)
+                sparse_output=False
+            ))
         ])
 
 
         final_preprocessor = ColumnTransformer([
             ('num_transformer', num_transformer, num_features),
-            ('layout_transformer', layout_parser, ["layout"] )
+            ('layout_transformer', layout_pipe, ["layout"] ),
+            ('nearest_station_tranformer', station_pipe, ["nearest_station"])
         ])
 
         return final_preprocessor
