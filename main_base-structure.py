@@ -4,7 +4,7 @@ import pathlib
 import os
 import pickle
 from sklearn.compose import ColumnTransformer
-from sklearn.model_selection import test_train_split
+from sklearn.model_selection import train_test_split
 
 from ml_logic.data_clean import initialize_clip, data_clean, add_clip_columns, average_scoring
 from ml_logic.model import initialize_model, train_model, evaluate_model
@@ -32,7 +32,8 @@ def load_data(path_to_project: str, nr_batches):
     clip = initialize_clip()
 
     previous_listing = 0
-    for listing in np.linspace(len(listings_full)/nr_batches,len(listings_full), nr_batches).astype("int"):
+    #for listing in np.linspace(len(listings_full)/nr_batches,len(listings_full), nr_batches).astype("int"):
+    for listing in [10,20]:
         start = previous_listing
         stop = listing
 
@@ -63,17 +64,18 @@ def load_data(path_to_project: str, nr_batches):
             .reset_index().drop(columns="index")
 
         # save csv
-        file_exists = os.path.isfile("images_cleaned.csv")
+        os.makedirs("data_dump", exist_ok=True)
+        file_exists = os.path.isfile("data_dump/images_cleaned.csv")
         if file_exists:
-            image_df.to_csv("images_cleaned.csv", mode = "a", header=False, index=False)
+            image_df.to_csv("data_dump/images_cleaned.csv", mode = "a", header=False, index=False)
         else:
-            image_df.to_csv("images_cleaned.csv", index = False)
+            image_df.to_csv("data_dump/images_cleaned.csv", index = False)
 
         file_exists = os.path.isfile("listings_cleaned.csv")
         if file_exists:
-            listings_df.to_csv("listings_cleaned.csv", mode = "a", header=False, index=False)
+            listings_df.to_csv("data_dump/listings_cleaned.csv", mode = "a", header=False, index=False)
         else:
-            listings_df.to_csv("listings_cleaned.csv", index = False)
+            listings_df.to_csv("data_dump/listings_cleaned.csv", index = False)
 
         # scoring dict into column for each attribute
         details_df = pd.json_normalize(image_df['scoring_dict'])
@@ -87,11 +89,11 @@ def load_data(path_to_project: str, nr_batches):
         listings_df = listings_df.merge(average_scores, on = "source_id")
 
         # write final data to csv
-        file_exists = os.path.isfile("listings_with_scores.csv")
+        file_exists = os.path.isfile("data_dump/listings_with_scores.csv")
         if file_exists:
-            listings_df.to_csv("listings_with_scores.csv", mode = "a", header=False, index=False)
+            listings_df.to_csv("data_dump/listings_with_scores.csv", mode = "a", header=False, index=False)
         else:
-            listings_df.to_csv("listings_with_scores.csv", index = False)
+            listings_df.to_csv("data_dump/listings_with_scores.csv", index = False)
         print("listings_with_scores.csv saved")
 
     return listings_df
@@ -104,7 +106,7 @@ def preprocess(
 
     ):
     data_path = pathlib.Path(path_to_project)
-    data = pd.read_csv(data_path / "listings_with_score.csv")
+    data = pd.read_csv(data_path / "data_dump/listings_with_score.csv")
 
     X = data.drop(columns=["price_man_yen"]).copy()
     y = data["price_man_yen"]
