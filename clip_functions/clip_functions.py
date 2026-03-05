@@ -21,15 +21,19 @@ def identify_default_images(image_path: str, clip):
     Output: 1 if DefaultImage, 0 if not DefaultImage
     """
 
-    labels = ["illustration, logo or advert", "floor plan", "image"]
-    results = clip(image_path, candidate_labels=labels)
+    try:
+        labels = ["illustration, logo or advert", "floor plan", "image"]
+        results = clip(image_path, candidate_labels=labels)
 
-    if results[0]["label"] == labels[0]:
+        if results[0]["label"] == labels[0]:
+            default_image = 2
+        elif results[0]["label"] == labels[1]:
+            default_image = 1
+        else:
+            default_image = 0
+
+    except:
         default_image = 2
-    elif results[0]["label"] == labels[1]:
-        default_image = 1
-    else:
-        default_image = 0
 
     return default_image
 
