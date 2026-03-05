@@ -61,7 +61,7 @@ def parse_layout(X):
 layout_parser = FunctionTransformer(parse_layout, feature_names_out="one-to-one")
 
 
-def preprocess_features(X):
+def get_fitted_preprocessor(X_train):
     """
     This function creates a preprocessor pipeline and returns X_processed.
     """
@@ -112,9 +112,8 @@ def preprocess_features(X):
 
     print("\nPreprocessing features...")
 
-    preprocessor = create_sklearn_preprocessor()
-    X_processed = preprocessor.fit_transform(X)
+    preprocessor = create_sklearn_preprocessor().fit(X_train)
 
-    print("✅ X_processed, with shape", X_processed.shape)
+    print("✅ returned preprocessor")
 
-    return X_processed
+    return preprocessor

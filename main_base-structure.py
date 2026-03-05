@@ -8,7 +8,7 @@ from sklearn.model_selection import test_train_split
 
 from ml_logic.data_clean import initialize_clip, data_clean, add_clip_columns, average_scoring
 from ml_logic.model import initialize_model, train_model, evaluate_model
-from preprocessor_pipeline import preprocess_features
+from preprocessor_pipeline import get_fitted_preprocessor
 
 def load_data(path_to_project: str, nr_batches):
 
@@ -109,16 +109,23 @@ def preprocess(
     X = data.drop(columns=["price_man_yen"]).copy()
     y = data["price_man_yen"]
 
-    X_preprocessed = preprocess_features(X)
+    def preprocess_y(y):
+        return np.log1p(y)
 
-    X_train, X_test, y_train, y_test = test_train_split(X_preprocessed, y, split_ratio)
+    X_train, X_test, y_train, y_test = test_train_split(X, y, split_ratio)
+    preprocesser = get_fitted_preprocessor(X_train)
 
-    X_train.to_csv(data_path / "data_dump/X_train.csv", index = False)
-    X_test.to_csv(data_path / "data_dump/X_test.csv", index = False)
-    y_train.to_csv(data_path / "data_dump/y_train.csv", index = False)
-    y_test.to_csv(data_path / "data_dump/y_test.csv", index = False)
+    X_train_preprocessed = preprocesser.transform(X_train)
+    X_test_preprocessed = preprocesser.transform(X_test)
+    y_train_preprocessed = preprocess_y(y_train)
+    y_test_preprocessed = preprocess_y(y_test)
 
-    return X_train, X_test, y_train, y_test
+    X_train_preprocessed.to_csv(data_path / "data_dump/X_train.csv", index = False)
+    X_test_preprocessed.to_csv(data_path / "data_dump/X_test.csv", index = False)
+    y_train_preprocessed.to_csv(data_path / "data_dump/y_train.csv", index = False)
+    y_test_preprocessed.to_csv(data_path / "data_dump/y_test.csv", index = False)
+
+    return X_train_preprocessed, X_test_preprocessed, y_train_preprocessed, y_test_preprocessed
 
 
 
