@@ -2,9 +2,12 @@ import pandas as pd
 import numpy as np
 import pathlib
 import os
+import pickle
 from sklearn.compose import ColumnTransformer
+from sklearn.model_selection import test_train_split
 
-from clip_functions.data_clean import initialize_clip, data_clean, add_clip_columns, average_scoring
+from ml_logic.data_clean import initialize_clip, data_clean, add_clip_columns, average_scoring
+from ml_logic.model import initialize_model, train_model, evaluate_model
 
 def load_data(path_to_project: str, nr_batches):
 
@@ -92,9 +95,126 @@ def load_data(path_to_project: str, nr_batches):
 
     return listings_df
 
+
+
+def preprocess(
+        path_to_project: str,
+        split_ratio: float = 0.3, # 0.3 default test_size
+
+    ):
+    data_path = pathlib.Path(path_to_project)
+    data = pd.read_csv(data_path / "listings_with_score.csv")
+
+    X_train, X_test, y_train, y_test = test_train_split(data, split_ratio)
+
+    "..."
+
+    X_train_preprocessed, X_test_preprocessed, y_train_preprocessed, y_test_preprocessed = "..."
+
+    return X_train_preprocessed, X_test_preprocessed, y_train_preprocessed, y_test_preprocessed
+
+
+
+def train(
+        path_to_project: str
+    ):
+
+    """
+    - Load processed training data from csv table
+    - Train on the preprocessed dataset
+    - Store model and cv-score
+
+    Return mse as a float
+    """
+
+    # Load processed data
+    data_path = pathlib.Path(path_to_project)
+    X_train = pd.read_csv(data_path / "X_train.csv")
+    y_train = pd.read_csv(data_path / "y_train.csv")
+
+    # depending on how Lances saves the preprocessed data: create (X_train_processed, y_train)
+
+    # initialize model
+    model = initialize_model()
+
+    # train model
+    model, cv = train_model(
+            model,
+            X_train,
+            y_train
+            )
+
+    # Save the model to a file
+    filename = data_path / 'finalized_model.sav'
+    with open(filename, 'wb') as file:
+        pickle.dump(model, file)
+
+    print("✅ train() done \n")
+
+    return model, cv
+
+
+def evaluate(
+        path_to_project: str
+    ):
+
+    data_path = pathlib.Path(path_to_project)
+    X_test = pd.read_csv(data_path / "X_test.csv")
+    y_test = pd.read_csv(data_path / "y_test.csv")
+
+    filename = data_path / 'finalized_model.sav'
+
+    # Load the model
+    with open(filename, 'rb') as file:
+        model = pickle.load(file)
+
+    mse = evaluate(
+        model,
+        X_test,
+        y_test
+        )
+
+    return mse
+
+
+def pred(
+        path_to_project: str,
+        X_pred: pd.DataFrame = None
+    ) -> np.ndarray:
+    """
+    Make a prediction using the latest trained model
+    """
+
+    print("\n⭐️ Use case: predict")
+
+    if X_pred is None:
+        X_pred = pd.DataFrame(dict(
+        pickup_datetime=[pd.Timestamp("2013-07-06 17:18:00", tz='UTC')],
+        pickup_longitude=[-73.950655],
+        pickup_latitude=[40.783282],
+        dropoff_longitude=[-73.984365],
+        dropoff_latitude=[40.769802],
+        passenger_count=[1],
+    ))
+
+    # Load the model
+    data_path = pathlib.Path(path_to_project)
+    filename = data_path / 'finalized_model.sav'
+
+    with open(filename, 'rb') as file:
+        model = pickle.load(file)
+    assert model is not None
+
+    X_processed = preprocess(X_pred) # use preprocess function from preprocess.py!!
+    y_pred = model.predict(X_processed)
+
+    print("\n✅ prediction done: ", y_pred, y_pred.shape, "\n")
+    return y_pred
+
+
 if __name__ == '__main__':
     load_data(".", 50)
-#    preprocess(min_date='2009-01-01', max_date='2015-01-01')
-#    train(min_date='2009-01-01', max_date='2015-01-01')
-#    evaluate(min_date='2009-01-01', max_date='2015-01-01')
+#    preprocess(".")
+#    train(".", 0.3)
+#    evaluate(".")
 #    pred()
