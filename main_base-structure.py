@@ -32,8 +32,7 @@ def load_data(path_to_project: str, nr_batches):
     clip = initialize_clip()
 
     previous_listing = 0
-    #for listing in np.linspace(len(listings_full)/nr_batches,len(listings_full), nr_batches).astype("int"):
-    for listing in [10,20]:
+    for listing in np.linspace(len(listings_full)/nr_batches,len(listings_full), nr_batches).astype("int"):
         start = previous_listing
         stop = listing
 
