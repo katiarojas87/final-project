@@ -4,9 +4,7 @@ import pathlib
 import os
 from sklearn.compose import ColumnTransformer
 
-from clip_functions.clip_functions import initialize_clip
-from clip_functions.data_clean import data_clean
-from clip_functions.adding_clip_columns import add_clip_columns, average_scoring
+from clip_functions.data_clean import initialize_clip, data_clean, add_clip_columns, average_scoring
 
 def load_data(path_to_project: str, nr_batches):
 
