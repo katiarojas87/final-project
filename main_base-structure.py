@@ -19,29 +19,29 @@ def load_data(path_to_project: str, nr_batches):
     # import listings.csv
     listings_df = pd.read_csv(data_path / "listings.csv")
 
+    # run data cleaning function
+    listings_df, image_df = data_clean(listings_df, image_df)
+
+    # define room list and attribute dict
+    RoomList = ["kitchen", "bathroom", "toilet", "living room", "bedroom", "walk-in closet", "closet", "entry inside", "exterior", "shop", "floor plan", "control panel", "entry outside"]
+    AttributeList = ["luxury", "brightness", "modernity"]
+
+    # initialize clip
+    clip = initialize_clip()
+
     previous_listing = 0
-    for listing in np.linspace(len(listings_df)/nr_batches,len(listings_df), nr_batches):
+    for listing in np.linspace(len(listings_df)/nr_batches,len(listings_df), nr_batches).astype("int"):
         start = previous_listing
         stop = listing
 
         previous_listing = listing
 
-        # TEMPORARY!!!
+        # df into batch
         listings_df = listings_df[start:stop]\
             .reset_index().drop(columns="index")
         source_id = listings_df["source_id"]
         image_df = image_df[image_df["source_id"].isin(source_id)]\
             .reset_index().drop(columns="index")
-
-        # run data cleaning function
-        listings_df, image_df = data_clean(listings_df, image_df)
-
-        # define room list and attribute dict
-        RoomList = ["kitchen", "bathroom", "toilet", "living room", "bedroom", "walk-in closet", "closet", "entry inside", "exterior", "shop", "floor plan", "control panel", "entry outside"]
-        AttributeList = ["luxury", "brightness", "modernity"]
-
-        # initialize clip
-        clip = initialize_clip()
 
         print("files imported, listings cleaned, clip initialized")
 
