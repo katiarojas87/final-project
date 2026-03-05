@@ -13,13 +13,13 @@ from preprocessor_pipeline import get_fitted_preprocessor
 def load_data(path_to_project: str, nr_batches):
 
     # Get the path of the current folder
-    data_path = pathlib.Path(path_to_project) / "raw_data"
+    data_path = pathlib.Path(path_to_project)
 
     # import images.csv
-    image_full = pd.read_csv(data_path / "images.csv")
+    image_full = pd.read_csv(data_path / "raw_data/images.csv")
 
     # import listings.csv
-    listings_full = pd.read_csv(data_path / "listings.csv")
+    listings_full = pd.read_csv(data_path / "raw_data/listings.csv")
 
     # run data cleaning function
     listings_full, image_full = data_clean(listings_full, image_full)
@@ -50,7 +50,7 @@ def load_data(path_to_project: str, nr_batches):
 
         # add columns and remove unwanted images
         image_df = add_clip_columns(df = image_df,
-                                    image_folder = data_path / "suumo_images",
+                                    image_folder = data_path / "raw_data/suumo_images",
                                     room_list = RoomList,
                                     attribute_list = AttributeList,
                                     clip = clip)
@@ -65,17 +65,17 @@ def load_data(path_to_project: str, nr_batches):
 
         # save csv
         os.makedirs("data_dump", exist_ok=True)
-        file_exists = os.path.isfile("data_dump/images_cleaned.csv")
+        file_exists = os.path.isfile(data_path / "data_dump/images_cleaned.csv")
         if file_exists:
-            image_df.to_csv("data_dump/images_cleaned.csv", mode = "a", header=False, index=False)
+            image_df.to_csv(data_path / "data_dump/images_cleaned.csv", mode = "a", header=False, index=False)
         else:
-            image_df.to_csv("data_dump/images_cleaned.csv", index = False)
+            image_df.to_csv(data_path / "data_dump/images_cleaned.csv", index = False)
 
-        file_exists = os.path.isfile("listings_cleaned.csv")
+        file_exists = os.path.isfile(data_path / "data_dump/listings_cleaned.csv")
         if file_exists:
-            listings_df.to_csv("data_dump/listings_cleaned.csv", mode = "a", header=False, index=False)
+            listings_df.to_csv(data_path / "data_dump/listings_cleaned.csv", mode = "a", header=False, index=False)
         else:
-            listings_df.to_csv("data_dump/listings_cleaned.csv", index = False)
+            listings_df.to_csv(data_path / "data_dump/listings_cleaned.csv", index = False)
 
         # scoring dict into column for each attribute
         details_df = pd.json_normalize(image_df['scoring_dict'])
@@ -89,11 +89,11 @@ def load_data(path_to_project: str, nr_batches):
         listings_df = listings_df.merge(average_scores, on = "source_id")
 
         # write final data to csv
-        file_exists = os.path.isfile("data_dump/listings_with_scores.csv")
+        file_exists = os.path.isfile(data_path / "data_dump/listings_with_scores.csv")
         if file_exists:
-            listings_df.to_csv("data_dump/listings_with_scores.csv", mode = "a", header=False, index=False)
+            listings_df.to_csv(data_path / "data_dump/listings_with_scores.csv", mode = "a", header=False, index=False)
         else:
-            listings_df.to_csv("data_dump/listings_with_scores.csv", index = False)
+            listings_df.to_csv(data_path / "data_dump/listings_with_scores.csv", index = False)
         print("listings_with_scores.csv saved")
 
     return listings_df
@@ -114,8 +114,13 @@ def preprocess(
     def preprocess_y(y):
         return np.log1p(y)
 
-    X_train, X_test, y_train, y_test = test_train_split(X, y, split_ratio)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, split_ratio)
     preprocesser = get_fitted_preprocessor(X_train)
+
+    # Save the preprocessor to a file
+    filename = data_path / "data_dump/preprocessor.sav"
+    with open(filename, 'wb') as file:
+        pickle.dump(preprocesser, file)
 
     X_train_preprocessed = preprocesser.transform(X_train)
     X_test_preprocessed = preprocesser.transform(X_test)
@@ -211,7 +216,12 @@ def pred(
         model = pickle.load(file)
     assert model is not None
 
-    X_processed = preprocess_features(X_new)
+    # Load the preprocessor
+    filename = data_path / "data_dump/preprocessor.sav"
+    with open(filename, 'rb') as file:
+        preprocessor = pickle.load(file)
+
+    X_processed = preprocessor.transform(X_new)
     y_pred = model.predict(X_processed)
 
     print("\n✅ prediction done: ", y_pred, y_pred.shape, "\n")
