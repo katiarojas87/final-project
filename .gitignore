@@ -210,3 +210,8 @@ __marimo__/
 
 raw_data/
 .DS_Store
+
+listings_with_scores.csv
+images_cleaned.csv
+listings_cleaned.csv
+
