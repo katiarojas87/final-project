@@ -209,3 +209,6 @@ __marimo__/
 raw_data/
 data_dump/
 .DS_Store
+
+#assessment tool
+secrets/
