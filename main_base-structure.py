@@ -8,7 +8,7 @@ from sklearn.model_selection import test_train_split
 
 from ml_logic.data_clean import initialize_clip, data_clean, add_clip_columns, average_scoring
 from ml_logic.model import initialize_model, train_model, evaluate_model
-from preprocessor_pipeline import get_fitted_preprocessor
+from ml_logic.preprocessor_pipeline import get_fitted_preprocessor
 
 def load_data(path_to_project: str, nr_batches):
 
