@@ -51,7 +51,8 @@ def get_fitted_preprocessor(X_train):
         station_pipe = Pipeline([
             ("ohe", OneHotEncoder(
                 min_frequency=10,        # ✅ tune this (10/20/50 depending on dataset size)
-                sparse_output=False
+                sparse_output=False,
+                handle_unknown='infrequent_if_exist'
             ))
         ])
 
@@ -59,7 +60,7 @@ def get_fitted_preprocessor(X_train):
         #ADD TO PASSTHROUGH LATER[condition_bathroom,condition_bedroom,condition_kitchen,condition_living_room,condition_toilet]
         # This propressor drops the old index, the image count, the address, URL,
         final_preprocessor = ColumnTransformer([
-            ("keep_columns", "passthrough", ["source_id", "rooms_num","luxury_bathroom","luxury_bedroom",
+            ("keep_columns", "passthrough", ["rooms_num","luxury_bathroom","luxury_bedroom",
                                              "luxury_kitchen","luxury_living_room","luxury_toilet","brightness_bathroom",
                                              "brightness_bedroom","brightness_kitchen","brightness_living_room",
                                              "brightness_toilet","condition_bathroom","condition_bedroom","condition_kitchen",

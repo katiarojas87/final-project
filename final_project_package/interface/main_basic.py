@@ -121,15 +121,15 @@ def preprocess(
     with open(filename, 'wb') as file:
         pickle.dump(preprocesser, file)
 
-    X_train_preprocessed = preprocesser.transform(X_train)
-    X_test_preprocessed = preprocesser.transform(X_test)
-    y_train_preprocessed = preprocess_y(y_train)
-    y_test_preprocessed = preprocess_y(y_test)
+    X_train_preprocessed = pd.DataFrame(preprocesser.transform(X_train), columns=preprocesser.get_feature_names_out(), index=X_train.index)
+    X_test_preprocessed = pd.DataFrame(preprocesser.transform(X_test), columns=preprocesser.get_feature_names_out(), index=X_test.index)
+    y_train_preprocessed = pd.Series(preprocess_y(y_train))
+    y_test_preprocessed = pd.Series(preprocess_y(y_test))
 
-    X_train_preprocessed.to_csv(data_path / "data_dump/X_train.csv", index = False)
-    X_test_preprocessed.to_csv(data_path / "data_dump/X_test.csv", index = False)
-    y_train_preprocessed.to_csv(data_path / "data_dump/y_train.csv", index = False)
-    y_test_preprocessed.to_csv(data_path / "data_dump/y_test.csv", index = False)
+    X_train_preprocessed.to_csv(data_path / "data_dump/X_train_preprocessed.csv", index = False)
+    X_test_preprocessed.to_csv(data_path / "data_dump/X_test_preprocessed.csv", index = False)
+    y_train_preprocessed.to_csv(data_path / "data_dump/y_train_preprocessed.csv", index = False)
+    y_test_preprocessed.to_csv(data_path / "data_dump/y_test_preprocessed.csv", index = False)
 
     return X_train_preprocessed, X_test_preprocessed, y_train_preprocessed, y_test_preprocessed
 
