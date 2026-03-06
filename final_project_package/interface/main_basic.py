@@ -6,8 +6,8 @@ import pickle
 from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split
 
-from ml_logic.data_clean import initialize_clip, data_clean, add_clip_columns, average_scoring
-from ml_logic.model import initialize_model, train_model, evaluate_model
+from final_project_package.ml_logic.data_clean import initialize_clip, data_clean, add_clip_columns, average_scoring
+from final_project_package.ml_logic.model import initialize_model, train_model, evaluate_model
 from preprocessor_pipeline import get_fitted_preprocessor
 
 def load_data(path_to_project: str, nr_batches):
@@ -105,7 +105,7 @@ def preprocess(
 
     ):
     data_path = pathlib.Path(path_to_project)
-    data = pd.read_csv(data_path / "data_dump/listings_with_score.csv")
+    data = pd.read_csv(data_path / "data_dump/listings_with_scores.csv")
 
     X = data.drop(columns=["price_man_yen"]).copy()
     y = data["price_man_yen"]
@@ -113,7 +113,7 @@ def preprocess(
     def preprocess_y(y):
         return np.log1p(y)
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, split_ratio)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=split_ratio)
     preprocesser = get_fitted_preprocessor(X_train)
 
     # Save the preprocessor to a file
