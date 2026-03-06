@@ -22,44 +22,6 @@ from sklearn.preprocessing import OrdinalEncoder
 from sklearn.preprocessing import TargetEncoder
 from sklearn.preprocessing import FunctionTransformer
 
-_layout_re = re.compile(r"^\s*(\d+)\s*(S?)\s*(LDK|DK|K|R)\s*$", re.IGNORECASE)
-
-_fw_digits = str.maketrans("０１２３４５６７８９", "0123456789")
-
-def parse_layout(X):
-    """
-    Input: X as 2D array (n_samples, 1) containing layout strings
-    Output: DataFrame with columns:
-      - rooms_num (int)
-      - base_layout (str: LDK/DK/K/R)
-      - has_S (int 0/1)
-    """
-    s = pd.Series(np.asarray(X).ravel()).fillna("").astype(str)
-    s = s.str.translate(_fw_digits).str.strip().str.upper()
-
-    rooms = []
-    base = []
-    has_s = []
-
-    for val in s:
-        m = _layout_re.match(val)
-        if not m:
-            rooms.append(np.nan)
-            base.append("UNKNOWN")
-            has_s.append(0)
-        else:
-            rooms.append(int(m.group(1)))
-            has_s.append(1 if m.group(2) == "S" else 0)
-            base.append(m.group(3))  # LDK/DK/K/R
-
-    return pd.DataFrame({
-        "rooms_num": rooms,
-        "base_layout": base,
-        "has_S": has_s
-    })
-
-layout_parser = FunctionTransformer(parse_layout, feature_names_out="one-to-one")
-
 
 def get_fitted_preprocessor(X_train):
     """
@@ -75,37 +37,27 @@ def get_fitted_preprocessor(X_train):
             ("robust_scaler", RobustScaler()) #Data with lots of outliers
         ])
 
-        layout_pipe = Pipeline([
-            ("encode", ColumnTransformer(
-                transformers=[
-                    # ordinal numeric feature (ordered)
-                    ("rooms_num", Pipeline([
-                        ("impute", SimpleImputer(strategy="median")),
-                    ]), ["rooms_num"]),
-
-                    # one-hot for the letter type
-                    ("base_layout", OneHotEncoder(handle_unknown="ignore", sparse_output=False), ["base_layout"]),
-                ],
-                remainder="passthrough"
-            ))
-        ])
-
         # cat_features = ["address"] this is unused yet.
+
+        base_layout_pipe = Pipeline([
+            'ordinal', OrdinalEncoder(categories=[["R", "K", "DK", "LDK"]])
+        ])
 
         station_pipe = Pipeline([
             ("ohe", OneHotEncoder(
-                handle_unknown="ignore",
                 min_frequency=15,        # ✅ tune this (10/20/50 depending on dataset size)
                 sparse_output=False
             ))
         ])
 
-
+        # This propressor drops the old index, the image count, the address, URL, 
         final_preprocessor = ColumnTransformer([
+            ("keep_columns", "passthrough", ["source_id", "rooms_num"]),
             ('num_transformer', num_transformer, num_features),
-            ('layout_transformer', layout_pipe, ["layout"] ),
-            ('nearest_station_tranformer', station_pipe, ["nearest_station"])
-        ])
+            ('nearest_station_tranformer', station_pipe, ["nearest_station"]),
+            ('ordinal', base_layout_pipe, ['base_layout'])
+            ], remainder= "drop"
+        )
 
         return final_preprocessor
 
