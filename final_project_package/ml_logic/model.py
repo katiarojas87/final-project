@@ -7,7 +7,7 @@ start = time.perf_counter()
 from sklearn.linear_model import LinearRegression
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.model_selection import cross_validate
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import root_mean_squared_error, mean_squared_error
 
 end = time.perf_counter()
 print(f"\n✅ TensorFlow loaded ({round(end - start, 2)}s)")
@@ -18,8 +18,8 @@ def initialize_model():
     """
     Initialize the model
     """
-    model = LinearRegression()
-    #model = KNeighborsRegressor()
+    #model = LinearRegression()
+    model = KNeighborsRegressor()
 
     print("✅ Model initialized")
 
@@ -34,14 +34,14 @@ def train_model(
     """
     Fit the model and return model and cross-validation
     """
-    cv = cross_validate(model, X_train, y_train, cv = 5)["test_score"].mean()
+    cv = cross_validate(model, X_train, y_train, cv = 5, scoring=['r2', 'neg_mean_squared_error'])
 
     model = model.fit(
         X_train,
         y_train
     )
 
-    print(f"✅ Model trained on {len(X_train)} rows with cross validation R2-score: {round(cv, 2)}")
+    print(f"✅ Model trained on {len(X_train)} rows with cross validation R2-score:{round(cv['test_r2'].mean(), 6)} and the MSE is {round(cv['test_neg_mean_squared_error'].mean(), 6)}")
 
     return model, cv
 
@@ -49,7 +49,7 @@ def train_model(
 def evaluate_model(
         model,
         X_test: np.ndarray,
-        y_test: np.ndarray
+        y_test_log: np.ndarray
     ):
     """
     Evaluate trained model performance on the dataset
@@ -59,12 +59,16 @@ def evaluate_model(
         print(f"\n❌ No model to evaluate")
         return None
 
-    pred = model.predict(
-        x=X_test
+    y_pred_log = model.predict(
+        X=X_test
     )
 
-    mse = mean_squared_error(y_test, pred)
+    y_test = np.expm1(y_test_log)
+    y_pred = np.expm1(y_pred_log)
 
-    print(f"✅ Model evaluated, MSE: {round(mse, 2)}")
+    rmse = root_mean_squared_error(y_test_log, y_pred_log)
+    mse = mean_squared_error(y_test_log, y_pred_log)
+
+    print(f"✅ Model evaluated, MSE: {round(mse, 7)}")
 
     return mse

@@ -179,8 +179,8 @@ def evaluate(
     ):
 
     data_path = pathlib.Path(path_to_project)
-    X_test = pd.read_csv(data_path / "data_dump/X_test.csv")
-    y_test = pd.read_csv(data_path / "data_dump/y_test.csv")
+    X_test = pd.read_csv(data_path / "data_dump/X_test_preprocessed.csv")
+    y_test = pd.read_csv(data_path / "data_dump/y_test_preprocessed.csv")
 
     filename = data_path / "data_dump/finalized_model.sav"
 

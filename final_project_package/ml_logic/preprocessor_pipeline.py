@@ -68,7 +68,7 @@ def get_fitted_preprocessor(X_train):
 
         station_pipe = Pipeline([
             ("ohe", OneHotEncoder(
-                min_frequency=10,        # ✅ tune this (10/20/50 depending on dataset size)
+                min_frequency=25,        # ✅ tune this (10/20/50 depending on dataset size)
                 sparse_output=False,
                 handle_unknown='infrequent_if_exist'
             ))
