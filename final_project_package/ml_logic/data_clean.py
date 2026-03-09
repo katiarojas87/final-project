@@ -255,3 +255,8 @@ def average_scoring(df, attribute_list):
     df_wide = df_wide.drop(columns=[attribute + "_floor_plan" for attribute in attribute_list])
 
     return df_wide.reset_index()
+
+
+##must still decide if this this necessary
+def clean_preprocessed():
+    return None

@@ -114,10 +114,10 @@ def preprocess(
         return np.log1p(y)
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=split_ratio)
-    preprocesser = get_fitted_preprocessor(X_train)
+    preprocesser = get_fitted_preprocessor(X_train, y_train)
 
     # Save the preprocessor to a file
-    filename = data_path / "data_dump/preprocessor.sav"
+    filename = data_path / "data_dump/preprocessor.pkl"
     with open(filename, 'wb') as file:
         pickle.dump(preprocesser, file)
 
@@ -149,8 +149,8 @@ def train(
 
     # Load processed data
     data_path = pathlib.Path(path_to_project)
-    X_train = pd.read_csv(data_path / "data_dump/X_train.csv")
-    y_train = pd.read_csv(data_path / "data_dump/y_train.csv")
+    X_train = pd.read_csv(data_path / "data_dump/X_train_preprocessed.csv")
+    y_train = pd.read_csv(data_path / "data_dump/y_train_preprocessed.csv")
 
     # depending on how Lances saves the preprocessed data: create (X_train_processed, y_train)
 
@@ -179,8 +179,8 @@ def evaluate(
     ):
 
     data_path = pathlib.Path(path_to_project)
-    X_test = pd.read_csv(data_path / "data_dump/X_test.csv")
-    y_test = pd.read_csv(data_path / "data_dump/y_test.csv")
+    X_test = pd.read_csv(data_path / "data_dump/X_test_preprocessed.csv")
+    y_test = pd.read_csv(data_path / "data_dump/y_test_preprocessed.csv")
 
     filename = data_path / "data_dump/finalized_model.sav"
 
