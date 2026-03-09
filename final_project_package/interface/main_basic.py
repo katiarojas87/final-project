@@ -100,12 +100,20 @@ def load_data(path_to_project: str, nr_batches):
 
 
 def preprocess(
-        path_to_project: str,
-        split_ratio: float = 0.3, # 0.3 default test_size
-
+    path_to_project: str,
+    split_ratio: float = 0.3, # 0.3 default test_size
     ):
+
     data_path = pathlib.Path(path_to_project)
     data = pd.read_csv(data_path / "data_dump/listings_with_scores.csv")
+
+    def fix_floating(row):
+        if row['floor_number'] > row['floors_total']:
+            row['floors_total'] = row['floor_number'] * 2
+
+        return row
+
+    data = data.apply(fix_floating, axis=1)
 
     X = data.drop(columns=["price_man_yen"]).copy()
     y = data["price_man_yen"]
