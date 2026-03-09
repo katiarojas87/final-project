@@ -114,7 +114,7 @@ def preprocess(
         return np.log1p(y)
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=split_ratio)
-    preprocesser = get_fitted_preprocessor(X_train)
+    preprocesser = get_fitted_preprocessor(X_train, y_train)
 
     # Save the preprocessor to a file
     filename = data_path / "data_dump/preprocessor.pkl"

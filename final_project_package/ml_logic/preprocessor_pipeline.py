@@ -1,9 +1,8 @@
-#core
+# core
 import pandas as pd
-import re
 import numpy as np
 
-#pipeline
+# pipeline
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 
@@ -11,94 +10,80 @@ from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 
 # Numerical scalers
-from sklearn.preprocessing import StandardScaler
-from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import RobustScaler
-from sklearn.preprocessing import PowerTransformer
 
 # Categorical encoders
-from sklearn.preprocessing import OneHotEncoder
-from sklearn.preprocessing import OrdinalEncoder
-from sklearn.preprocessing import TargetEncoder
-from sklearn.preprocessing import FunctionTransformer
+from sklearn.preprocessing import OrdinalEncoder, TargetEncoder, FunctionTransformer
+
 
 def aggregate_columns(X):
-            X = np.asarray(X)
-            return np.nanmean(X, axis=1).reshape(-1, 1)
+    X = np.asarray(X)
+    return np.nanmean(X, axis=1).reshape(-1, 1)
+
 
 def mean_luxury_name(transformer, input_features):
     return ["mean_luxury"]
 
+
 def mean_brightness_name(transformer, input_features):
     return ["mean_brightness"]
+
 
 def mean_condition_name(transformer, input_features):
     return ["mean_condition"]
 
 
-mean_luxury_transformer = FunctionTransformer(aggregate_columns, feature_names_out=mean_luxury_name)
-mean_brightness_transformer = FunctionTransformer(aggregate_columns, feature_names_out=mean_brightness_name)
-mean_condition_transformer = FunctionTransformer(aggregate_columns, feature_names_out=mean_condition_name)
+mean_luxury_transformer = FunctionTransformer(
+    aggregate_columns,
+    feature_names_out=mean_luxury_name
+)
+
+mean_brightness_transformer = FunctionTransformer(
+    aggregate_columns,
+    feature_names_out=mean_brightness_name
+)
+
+mean_condition_transformer = FunctionTransformer(
+    aggregate_columns,
+    feature_names_out=mean_condition_name
+)
 
 
-def get_fitted_preprocessor(X_train):
+def get_fitted_preprocessor(X_train, y_train):
     """
-    This function creates a preprocessor pipeline and returns X_processed.
+    Create and fit a preprocessing pipeline.
     """
-    def create_sklearn_preprocessor() -> ColumnTransformer:
-        num_features = ["area_sqm","year_built","floor_number","floors_total","walk_minutes"]
 
-        num_transformer = Pipeline ([
-            # ("imputer", SimpleImputer(strategy="mean")), #Missing values, normally distributed
-            # ("standard_scaler", StandardScaler()), #Features on different scales, linear models
-            # ("minmax_scaler", MinMaxScaler()), #When you need values between 0–1
-            ("robust_scaler", RobustScaler()) #Data with lots of outliers
-        ])
+    num_features = ["area_sqm", "year_built", "floor_number", "floors_total", "walk_minutes"]
 
-        # cat_features = ["address"] this is unused yet.
+    num_transformer = Pipeline([
+        ("robust_scaler", RobustScaler())
+    ])
 
-        base_layout_pipe = Pipeline([
-            ("imputer", SimpleImputer(strategy="most_frequent")),
-            ("ordinal", OrdinalEncoder(
-                categories=[["R", "K", "DK", "LDK"]],
-                handle_unknown="use_encoded_value",
-                unknown_value=-1
-            ))
-        ])
+    base_layout_pipe = Pipeline([
+        ("imputer", SimpleImputer(strategy="most_frequent")),
+        ("ordinal", OrdinalEncoder(
+            categories=[["R", "K", "DK", "LDK"]],
+            handle_unknown="use_encoded_value",
+            unknown_value=-1
+        ))
+    ])
 
-        station_pipe = Pipeline([
-            ("ohe", OneHotEncoder(
-                min_frequency=25,        # ✅ tune this (10/20/50 depending on dataset size)
-                sparse_output=False,
-                handle_unknown='infrequent_if_exist'
-            ))
-        ])
-
-
-        #ADD TO PASSTHROUGH LATER[condition_bathroom,condition_bedroom,condition_kitchen,condition_living_room,condition_toilet]
-        # This propressor drops the old index, the image count, the address, URL,
-        final_preprocessor = ColumnTransformer([
-            ("keep_columns", "passthrough", ["rooms_num"]),
-            ('num_transformer', num_transformer, num_features),
-            ('nearest_station_tranformer', station_pipe, ["nearest_station"]),
-            ('ordinal_transformer', base_layout_pipe, ['base_layout']),
-            ('mean_luxury_transformer', mean_luxury_transformer, ["luxury_bathroom","luxury_bedroom",
-                                             "luxury_kitchen","luxury_living_room","luxury_toilet"]),
-            ('mean_brightness_transformer', mean_brightness_transformer, ["brightness_bathroom",
-                                             "brightness_bedroom","brightness_kitchen","brightness_living_room",
-                                             "brightness_toilet"]),
-            ('mean_condition_transformer', mean_condition_transformer, ["condition_bathroom","condition_bedroom","condition_kitchen",
-                                             "condition_living_room","condition_toilet"])
-            ], remainder= "drop"
-        )
-
-        return final_preprocessor
-
+    final_preprocessor = ColumnTransformer([
+        ("keep_rooms", "passthrough", ["rooms_num"]),
+        ("num_transformer", num_transformer, num_features),
+        ("station_transformer", TargetEncoder(target_type="continuous"), ["nearest_station"]),
+        ("ordinal_transformer", base_layout_pipe, ["base_layout"]),
+        ("mean_luxury_transformer", mean_luxury_transformer,
+         ["luxury_bathroom", "luxury_bedroom", "luxury_kitchen", "luxury_living_room", "luxury_toilet"]),
+        ("mean_brightness_transformer", mean_brightness_transformer,
+         ["brightness_bathroom", "brightness_bedroom", "brightness_kitchen", "brightness_living_room", "brightness_toilet"]),
+        ("mean_condition_transformer", mean_condition_transformer,
+         ["condition_bathroom", "condition_bedroom", "condition_kitchen", "condition_living_room", "condition_toilet"])
+    ], remainder="drop")
 
     print("\nPreprocessing features...")
-
-    preprocessor = create_sklearn_preprocessor().fit(X_train)
-
+    preprocessor = final_preprocessor.fit(X_train, y_train)
     print("✅ returned preprocessor")
 
     return preprocessor
