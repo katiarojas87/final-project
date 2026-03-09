@@ -25,7 +25,7 @@ def load_data(path_to_project: str, nr_batches):
     listings_full, image_full = data_clean(listings_full, image_full)
 
     # define room list and attribute dict
-    RoomList = ["kitchen", "bathroom", "toilet", "living room", "bedroom", "walk-in closet", "closet", "entry inside", "exterior", "shop", "floor plan", "control panel", "entry outside", "balcony"]
+    RoomList = ["kitchen", "bathroom", "toilet", "living room", "bedroom", "walk-in closet", "closet", "entry inside", "exterior", "shop", "floor plan", "control panel", "entry outside", "balcony", "logo", "advertisement", "animal", "corridor", "elevator", "bicycle", "intercom", "telephone"]
     AttributeList = ["luxury", "brightness", "condition"]
 
     # initialize clip

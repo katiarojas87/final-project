@@ -143,11 +143,11 @@ def get_score(image_path: str, room_type: str, attribute_list: list, clip):
 
         else:
             if attribute == "brightness":
-                labels = ["bright", "not bright"]
+                labels = [f"a well-lit {room_type} with bright walls, large windows and daylight", f"a dark {room_type} with poor lighting, small windows and no light"]
             elif attribute == "luxury":
-                labels = ["expensive", "cheap"]
+                labels = [f"a photo of an expensive, luxurious {room_type} with premium finishes", f"a photo of a cheap, basic {room_type} with low-quality materials"]
             elif attribute == "condition":
-                labels = ["new", "used"]
+                labels = ["a photo of a brand new, renovated room", "a photo of an old, worn-out room in poor condition"]
             else:
                 labels = ["yes "+attribute, "no "+attribute]
 

@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Room Labeler Pro</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Inconsolata:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg:      #f5f2eb;
+  --surface: #edeae0;
+  --card:    #ffffff;
+  --border:  #d8d3c8;
+  --ink:     #1a1814;
+  --muted:   #8a8478;
+  --gold:    #c4922a;
+  --gold-lt: #f5e8c8;
+  --teal:    #2a7c6f;
+  --teal-lt: #c0e8e0;
+  --red:     #b83a2a;
+  --red-lt:  #f5d0c8;
+  --r:       8px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: 'Inconsolata', monospace;
+  height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+}
+
+/* header */
+header {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  padding: 11px 24px;
+  background: var(--ink);
+  gap: 16px; flex-shrink: 0;
+}
+.logo {
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: 1.05rem; color: var(--bg);
+  display: flex; align-items: center; gap: 8px;
+}
+.badge {
+  background: var(--gold); color: var(--ink);
+  font-family: 'Inconsolata', monospace;
+  font-size: 0.55rem; padding: 2px 7px;
+  border-radius: 99px; letter-spacing: 2px; text-transform: uppercase;
+}
+.hcenter {
+  display: flex; align-items: center; gap: 16px; flex: 1; justify-content: center;
+}
+.stat {
+  background: #2a2820; border-radius: 99px;
+  padding: 4px 14px; font-size: 0.7rem; color: #b0aa98;
+}
+.stat strong { color: var(--gold); }
+.prog-wrap { display: flex; align-items: center; gap: 8px; min-width: 160px; }
+.prog-bg {
+  flex: 1; height: 4px; background: #3a3830;
+  border-radius: 99px; overflow: hidden;
+}
+.prog-fill {
+  height: 100%; background: linear-gradient(90deg, var(--gold), #e8b84a);
+  border-radius: 99px; transition: width 0.5s; width: 0%;
+}
+.prog-lbl { font-size: 0.68rem; color: #8a8478; white-space: nowrap; }
+.hbtn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 13px; border-radius: var(--r);
+  border: 1px solid #3a3830; background: transparent;
+  color: var(--bg); font-family: 'Inconsolata', monospace;
+  font-size: 0.73rem; cursor: pointer; transition: all .15s;
+  text-decoration: none; white-space: nowrap;
+}
+.hbtn:hover { background: #3a3830; }
+.hbtn.gold { background: var(--gold); color: var(--ink); border-color: var(--gold); font-weight: 600; }
+.hbtn.gold:hover { background: #e8b84a; }
+.hbtn:disabled { opacity: .35; pointer-events: none; }
+
+/* main grid */
+main {
+  flex: 1; display: grid;
+  grid-template-columns: 1fr 400px;
+  overflow: hidden;
+}
+
+/* image pane */
+.img-pane {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 24px; background: var(--surface);
+  position: relative; overflow: hidden;
+}
+.img-pane::before {
+  content: ''; position: absolute; inset: 0;
+  background-image: radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0);
+  background-size: 28px 28px; opacity: .5; pointer-events: none;
+}
+.img-counter {
+  position: absolute; top: 14px; left: 18px;
+  font-size: .66rem; color: var(--muted); letter-spacing: 1px; z-index: 1;
+}
+.img-box {
+  width: 100%; max-width: 680px; aspect-ratio: 4/3;
+  background: var(--card); border-radius: 12px; overflow: hidden;
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 24px rgba(26,24,20,.1); z-index: 1; position: relative;
+}
+.img-box img { width: 100%; height: 100%; object-fit: cover; }
+.img-placeholder {
+  display: flex; flex-direction: column;
+  align-items: center; gap: 10px;
+  color: var(--muted); font-size: .82rem;
+}
+.img-nav {
+  position: absolute; bottom: 18px;
+  display: flex; gap: 8px; z-index: 1;
+}
+.nav-btn {
+  padding: 6px 14px; border-radius: var(--r);
+  border: 1px solid var(--border); background: var(--card);
+  color: var(--ink); font-family: 'Inconsolata', monospace;
+  font-size: .73rem; cursor: pointer; transition: all .15s;
+}
+.nav-btn:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+/* right panel */
+.right {
+  border-left: 1px solid var(--border);
+  background: var(--card);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.room-meta {
+  padding: 12px 18px;
+  background: var(--ink); color: #b0aa98;
+  font-size: .68rem; line-height: 1.8;
+  border-bottom: 1px solid #3a3830; flex-shrink: 0;
+}
+.room-meta strong { color: var(--gold); }
+
+.compare-scroll {
+  flex: 1; overflow-y: auto; padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+
+.sec-title {
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: .72rem; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--ink); padding-bottom: 8px; border-bottom: 2px solid var(--ink);
+}
+
+/* attribute card */
+.attr-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 12px;
+  display: flex; flex-direction: column; gap: 9px;
+  transition: border-color .2s, background .2s;
+}
+.attr-card.ok  { border-color: var(--teal); background: #f0faf8; }
+.attr-card.bad { border-color: var(--red);  background: #fdf0ee; }
+
+.attr-top {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.attr-name {
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: .7rem; letter-spacing: 1.5px; text-transform: uppercase;
+}
+.verdict {
+  font-size: .62rem; padding: 2px 8px; border-radius: 4px; font-weight: 500;
+}
+.v-pos  { background: var(--teal-lt); color: var(--teal); }
+.v-neg  { background: var(--red-lt);  color: var(--red);  }
+.v-mid  { background: var(--gold-lt); color: var(--gold); }
+.v-none { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
+
+.compare-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.cc-label { font-size: .57rem; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+
+/* manual tag */
+.mtag {
+  display: inline-block; padding: 2px 8px; border-radius: 4px;
+  font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .5px;
+}
+.t-yes  { background: var(--teal-lt); color: var(--teal); }
+.t-no   { background: var(--red-lt);  color: var(--red);  }
+.t-new  { background: var(--gold-lt); color: var(--gold); }
+.t-used { background: #ede8f8; color: #5a4a8a; }
+.t-na   { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
+
+/* score bar */
+.score-row { display: flex; align-items: center; gap: 7px; }
+.sbar-bg { flex: 1; height: 6px; background: var(--border); border-radius: 99px; overflow: hidden; }
+.sbar-fill { height: 100%; border-radius: 99px; transition: width .55s cubic-bezier(.4,0,.2,1); }
+.snum { font-size: .75rem; font-weight: 600; min-width: 32px; text-align: right; }
+
+/* validation buttons */
+.val-row { display: flex; gap: 6px; padding-top: 8px; border-top: 1px solid var(--border); }
+.vbtn {
+  flex: 1; padding: 5px 8px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--bg);
+  color: var(--muted); font-family: 'Inconsolata', monospace;
+  font-size: .68rem; cursor: pointer; transition: all .12s; text-align: center;
+}
+.vbtn:hover { border-color: var(--ink); color: var(--ink); }
+.vbtn.ok  { background: var(--teal-lt); border-color: var(--teal); color: var(--teal); font-weight: 600; }
+.vbtn.bad { background: var(--red-lt);  border-color: var(--red);  color: var(--red);  font-weight: 600; }
+
+/* bottom actions */
+.actions {
+  padding: 14px 18px; border-top: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;
+}
+.submit-btn {
+  width: 100%; padding: 11px; border-radius: var(--r); border: none;
+  background: var(--ink); color: var(--bg);
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: .82rem; cursor: pointer; transition: all .15s; letter-spacing: .5px;
+}
+.submit-btn:hover { background: var(--gold); color: var(--ink); }
+.skip-btn {
+  width: 100%; padding: 7px; border-radius: var(--r);
+  border: 1px solid var(--border); background: transparent;
+  color: var(--muted); font-family: 'Inconsolata', monospace;
+  font-size: .73rem; cursor: pointer; transition: all .15s;
+}
+.skip-btn:hover { border-color: var(--red); color: var(--red); }
+.status {
+  font-size: .68rem; padding: 7px 10px; border-radius: 6px;
+  text-align: center; display: none;
+}
+.status.ok  { background: var(--teal-lt); color: var(--teal); display: block; }
+.status.err { background: var(--red-lt);  color: var(--red);  display: block; }
+
+/* loader */
+#loader {
+  position: fixed; inset: 0; background: var(--bg);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 20px; z-index: 999;
+}
+.spinner {
+  width: 34px; height: 34px;
+  border: 3px solid var(--border); border-top-color: var(--gold);
+  border-radius: 50%; animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loader-txt { font-family: 'Syne', sans-serif; font-weight: 600; font-size: .95rem; color: var(--muted); }
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+</style>
+</head>
+<body>
+
+<div id="loader">
+  <div class="spinner"></div>
+  <div class="loader-txt">Loading assessment data…</div>
+</div>
+
+<header>
+  <div class="logo">Room Labeler <span class="badge">Pro</span></div>
+  <div class="hcenter">
+    <div class="stat">Validated <strong id="nVal">0</strong> / <strong id="nTot">0</strong></div>
+    <div class="prog-wrap">
+      <div class="prog-bg"><div class="prog-fill" id="progFill"></div></div>
+      <div class="prog-lbl" id="progLbl">0%</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <button class="hbtn" id="btnSave">💾 Save</button>
+    <a class="hbtn gold" href="/api/download">⬇ CSV</a>
+  </div>
+</header>
+
+<main>
+  <div class="img-pane">
+    <div class="img-counter" id="imgCtr">— / —</div>
+    <div class="img-box" id="imgBox">
+      <div class="img-placeholder">
+        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/>
+          <path d="M21 15l-5-5L5 21"/>
+        </svg>
+        <span>No image</span>
+      </div>
+    </div>
+    <div class="img-nav">
+      <button class="nav-btn" id="btnPrev">← Prev</button>
+      <button class="nav-btn" id="btnNext">Next →</button>
+    </div>
+  </div>
+
+  <div class="right">
+    <div class="room-meta" id="roomMeta">—</div>
+
+    <div class="compare-scroll">
+      <div class="sec-title">Your Label vs Claude Score</div>
+
+      <!-- LUXURY -->
+      <div class="attr-card" id="cardLux">
+        <div class="attr-top">
+          <div class="attr-name">Luxury</div>
+          <div class="verdict v-none" id="vdtLux">—</div>
+        </div>
+        <div class="compare-cols">
+          <div>
+            <div class="cc-label">Your label</div>
+            <span class="mtag t-na" id="mLux">—</span>
+          </div>
+          <div>
+            <div class="cc-label">Claude score</div>
+            <div class="score-row">
+              <div class="sbar-bg"><div class="sbar-fill" id="bLux" style="width:0%;background:var(--gold)"></div></div>
+              <div class="snum" id="sLux">—</div>
+            </div>
+          </div>
+        </div>
+        <div class="val-row">
+          <button class="vbtn" id="voLux" onclick="setVal('lux','correct')">✓ Correct</button>
+          <button class="vbtn" id="vxLux" onclick="setVal('lux','incorrect')">✗ Wrong</button>
+        </div>
+      </div>
+
+      <!-- BRIGHTNESS -->
+      <div class="attr-card" id="cardBright">
+        <div class="attr-top">
+          <div class="attr-name">Brightness</div>
+          <div class="verdict v-none" id="vdtBright">—</div>
+        </div>
+        <div class="compare-cols">
+          <div>
+            <div class="cc-label">Your label</div>
+            <span class="mtag t-na" id="mBright">—</span>
+          </div>
+          <div>
+            <div class="cc-label">Claude score</div>
+            <div class="score-row">
+              <div class="sbar-bg"><div class="sbar-fill" id="bBright" style="width:0%;background:var(--teal)"></div></div>
+              <div class="snum" id="sBright">—</div>
+            </div>
+          </div>
+        </div>
+        <div class="val-row">
+          <button class="vbtn" id="voBright" onclick="setVal('bright','correct')">✓ Correct</button>
+          <button class="vbtn" id="vxBright" onclick="setVal('bright','incorrect')">✗ Wrong</button>
+        </div>
+      </div>
+
+      <!-- CONDITION -->
+      <div class="attr-card" id="cardCond">
+        <div class="attr-top">
+          <div class="attr-name">Condition</div>
+          <div class="verdict v-none" id="vdtCond">—</div>
+        </div>
+        <div class="compare-cols">
+          <div>
+            <div class="cc-label">Your label</div>
+            <span class="mtag t-na" id="mCond">—</span>
+          </div>
+          <div>
+            <div class="cc-label">Claude score</div>
+            <div class="score-row">
+              <div class="sbar-bg"><div class="sbar-fill" id="bCond" style="width:0%;background:#5a4a8a"></div></div>
+              <div class="snum" id="sCond">—</div>
+            </div>
+          </div>
+        </div>
+        <div class="val-row">
+          <button class="vbtn" id="voCond" onclick="setVal('cond','correct')">✓ Correct</button>
+          <button class="vbtn" id="vxCond" onclick="setVal('cond','incorrect')">✗ Wrong</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="submit-btn" onclick="submit()">Save & Next →</button>
+      <button class="skip-btn"   onclick="skip()">Skip</button>
+      <div class="status" id="statusBar"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+const THRESH = { lux: 0.55, bright: 0.64, cond: 0.82 };
+
+let rows    = [];
+let cur     = 0;
+let pending = [];
+let vals    = { lux: null, bright: null, cond: null };
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+async function init() {
+  try {
+    const res  = await fetch('/api/data');
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    rows = data.rows || [];
+    document.getElementById('nTot').textContent = data.total || rows.length;
+    updateProg();
+    cur = data.first ?? 0;
+    render(cur);
+  } catch(e) {
+    document.getElementById('loader').innerHTML =
+      `<div style="color:#b83a2a;font-family:Inconsolata,monospace;text-align:center;padding:32px">
+        ⚠ Failed to load.<br><br><small style="color:#8a8478">${e.message}</small>
+      </div>`;
+    return;
+  }
+  document.getElementById('loader').style.display = 'none';
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function render(idx) {
+  if (idx < 0 || idx >= rows.length) return;
+  cur = idx;
+  const r = rows[idx];
+
+  // image
+  const box = document.getElementById('imgBox');
+  const url = r.image_url || r.image_path || '';
+  box.innerHTML = url
+    ? `<img src="${url}" alt="room" onerror="this.parentElement.innerHTML='<div style=\\'padding:20px;color:#b83a2a;font-size:.8rem\\'>⚠ Image not found</div>'">`
+    : `<div class="img-placeholder"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span>No image</span></div>`;
+
+  document.getElementById('imgCtr').textContent  = `${idx + 1} / ${rows.length}`;
+  document.getElementById('roomMeta').innerHTML  = `<strong>Room:</strong> ${r.room_type || '—'}`;
+
+  // manual tags
+  setMTag('mLux',   r.manual_lux);
+  setMTag('mBright', r.manual_bright);
+  setMTag('mCond',  r.manual_cond);
+
+  // scores
+  setScore('Lux',   r.score_lux,    THRESH.lux,    'var(--gold)');
+  setScore('Bright', r.score_bright, THRESH.bright, 'var(--teal)');
+  setScore('Cond',  r.score_cond,   THRESH.cond,   '#5a4a8a');
+
+  // restore saved validations
+  resetVals();
+  if (r.val_lux)    setVal('lux',    r.val_lux,    false);
+  if (r.val_bright) setVal('bright', r.val_bright, false);
+  if (r.val_cond)   setVal('cond',   r.val_cond,   false);
+
+  hideStatus();
+}
+
+function setMTag(id, value) {
+  const el  = document.getElementById(id);
+  const v   = (value || '').toLowerCase().trim();
+  const map = { yes: 't-yes', no: 't-no', new: 't-new', used: 't-used' };
+  el.textContent = v ? v.toUpperCase() : '—';
+  el.className   = `mtag ${map[v] || 't-na'}`;
+}
+
+function setScore(sfx, score, thresh, color) {
+  const bar = document.getElementById('b' + sfx);
+  const num = document.getElementById('s' + sfx);
+  const vdt = document.getElementById('vdt' + sfx);
+  if (score === null || score === undefined) {
+    bar.style.width = '0%';
+    num.textContent = '—';
+    vdt.textContent = 'no score'; vdt.className = 'verdict v-none';
+    return;
+  }
+  bar.style.width      = Math.round(score * 100) + '%';
+  bar.style.background = color;
+  num.textContent      = score.toFixed(2);
+  if      (score >= thresh + 0.08) { vdt.textContent = '↑ Positive';   vdt.className = 'verdict v-pos'; }
+  else if (score >= thresh)        { vdt.textContent = '~ Borderline'; vdt.className = 'verdict v-mid'; }
+  else                             { vdt.textContent = '↓ Negative';   vdt.className = 'verdict v-neg'; }
+}
+
+// ── Validation ────────────────────────────────────────────────────────────────
+function setVal(attr, value, store = true) {
+  if (store) vals[attr] = value;
+  const map = {
+    lux:    { ok: 'voLux',    bad: 'vxLux',    card: 'cardLux'    },
+    bright: { ok: 'voBright', bad: 'vxBright', card: 'cardBright' },
+    cond:   { ok: 'voCond',   bad: 'vxCond',   card: 'cardCond'   },
+  };
+  const { ok, bad, card } = map[attr];
+  document.getElementById(ok).className   = 'vbtn' + (value === 'correct'   ? ' ok'  : '');
+  document.getElementById(bad).className  = 'vbtn' + (value === 'incorrect' ? ' bad' : '');
+  const cardEl = document.getElementById(card);
+  cardEl.classList.remove('ok', 'bad');
+  if (value === 'correct')   cardEl.classList.add('ok');
+  if (value === 'incorrect') cardEl.classList.add('bad');
+}
+
+function resetVals() {
+  vals = { lux: null, bright: null, cond: null };
+  ['voLux','vxLux','voBright','vxBright','voCond','vxCond'].forEach(id => {
+    document.getElementById(id).className = 'vbtn';
+  });
+  ['cardLux','cardBright','cardCond'].forEach(id => {
+    document.getElementById(id).classList.remove('ok','bad');
+  });
+}
+
+// ── Submit ────────────────────────────────────────────────────────────────────
+function submit() {
+  if (!vals.lux && !vals.bright && !vals.cond) {
+    showStatus('Validate at least one attribute.', 'err'); return;
+  }
+  if (vals.lux)    rows[cur].val_lux    = vals.lux;
+  if (vals.bright) rows[cur].val_bright = vals.bright;
+  if (vals.cond)   rows[cur].val_cond   = vals.cond;
+
+  pending.push({ row_index: cur, row_data: rows[cur] });
+  updateProg();
+  autoSave();
+
+  const next = nextUnvalidated(cur + 1);
+  if (next !== null) render(next);
+  else showStatus('✓ All validated!', 'ok');
+}
+
+function skip() {
+  const next = nextUnvalidated(cur + 1);
+  if (next !== null) render(next);
+  else showStatus('No more rows.', 'ok');
+}
+
+function nextUnvalidated(from) {
+  for (let i = from; i < rows.length; i++)
+    if (!rows[i].val_lux && rows[i].score_lux !== null) return i;
+  for (let i = 0; i < from; i++)
+    if (!rows[i].val_lux && rows[i].score_lux !== null) return i;
+  return null;
+}
+
+function updateProg() {
+  const v   = rows.filter(r => r.val_lux).length;
+  const tot = rows.length;
+  const pct = tot ? Math.round(v / tot * 100) : 0;
+  document.getElementById('progFill').style.width = pct + '%';
+  document.getElementById('progLbl').textContent  = pct + '%';
+  document.getElementById('nVal').textContent     = v;
+}
+
+// ── Save ──────────────────────────────────────────────────────────────────────
+async function autoSave() {
+  await fetch('/api/save', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rows, updates: pending })
+  });
+  pending = [];
+}
+
+document.getElementById('btnSave').addEventListener('click', async () => {
+  document.getElementById('btnSave').disabled = true;
+  try {
+    const res  = await fetch('/api/save', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows, updates: pending })
+    });
+    const data = await res.json();
+    if (data.ok) { pending = []; showStatus('✓ Saved.', 'ok'); }
+    else showStatus('Error: ' + data.error, 'err');
+  } finally {
+    document.getElementById('btnSave').disabled = false;
+  }
+});
+
+document.getElementById('btnPrev').addEventListener('click', () => { if (cur > 0) render(cur - 1); });
+document.getElementById('btnNext').addEventListener('click', () => { if (cur < rows.length - 1) render(cur + 1); });
+
+document.addEventListener('keydown', e => {
+  if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+  if (e.key === 'ArrowRight' || e.key === 'Enter') submit();
+  if (e.key === 'ArrowLeft') render(Math.max(0, cur - 1));
+  if (e.key === 's') document.getElementById('btnSave').click();
+});
+
+function showStatus(msg, type) {
+  const b = document.getElementById('statusBar');
+  b.textContent = msg; b.className = 'status ' + type;
+}
+function hideStatus() { document.getElementById('statusBar').className = 'status'; }
+
+init();
+</script>
+</body>
+</html>
