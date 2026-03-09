@@ -6,6 +6,7 @@ start = time.perf_counter()
 
 from sklearn.linear_model import LinearRegression
 from sklearn.neighbors import KNeighborsRegressor
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import cross_validate
 from sklearn.metrics import root_mean_squared_error, mean_squared_error
 
@@ -19,7 +20,8 @@ def initialize_model():
     Initialize the model
     """
     #model = LinearRegression()
-    model = KNeighborsRegressor()
+    #model = KNeighborsRegressor()
+    model = RandomForestRegressor(random_state=42, max_depth= None, n_estimators= 100)
 
     print("✅ Model initialized")
 
