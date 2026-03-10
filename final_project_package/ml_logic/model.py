@@ -31,19 +31,31 @@ def initialize_model():
 def train_model(
         model,
         X_train: np.ndarray,
-        y_train: np.ndarray
+        y_train_log: np.ndarray
     ):
     """
     Fit the model and return model and cross-validation
     """
-    cv = cross_validate(model, X_train, y_train, cv = 5, scoring=['r2', 'neg_mean_squared_error'])
+    cv = cross_validate(model, X_train, y_train_log, cv = 5, scoring=['r2', 'neg_mean_squared_error'])
 
     model = model.fit(
         X_train,
-        y_train
+        y_train_log
     )
 
-    print(f"✅ Model trained on {len(X_train)} rows with cross validation R2-score:{round(cv['test_r2'].mean(), 6)} and the MSE is {round(cv['test_neg_mean_squared_error'].mean(), 6)}")
+    y_pred_log = model.predict(
+        X=X_train
+    )
+
+    y_train = np.expm1(y_train_log)
+    y_pred = np.expm1(y_pred_log)
+
+    rmse = root_mean_squared_error(y_train, y_pred)
+    mse = mean_squared_error(y_train, y_pred)
+
+    print(f"✅ Model train metrics, MSE: {round(mse, 7)} and RMSE: {round(rmse, 7)}")
+
+    print(f"Cross Validated Model trained on {len(X_train)} rows with cross validation R2-score:{round(cv['test_r2'].mean(), 6)} and the MSE is {round(cv['test_neg_mean_squared_error'].mean(), 6)}")
 
     return model, cv
 

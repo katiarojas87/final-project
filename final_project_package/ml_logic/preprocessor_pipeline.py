@@ -85,7 +85,7 @@ def get_fitted_preprocessor(X_train, y_train):
     ])
 
     final_preprocessor = ColumnTransformer([
-        ("keep_rooms", "passthrough", ["rooms_num"]),
+        ("keep_rooms", "passthrough", ["rooms_num","latitude", "longitude"]),
         ("station_transformer", station_pipe, ["nearest_station"]),
         ("num_transformer", num_transformer, num_features),
         ("ordinal_transformer", base_layout_pipe, ["base_layout"]),
