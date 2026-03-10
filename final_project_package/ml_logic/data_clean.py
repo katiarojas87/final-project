@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib as mlpt
 import requests
 import torch
-import tqdm
+from tqdm import tqdm
 from transformers import pipeline
 import re
 from scipy.stats import zscore
