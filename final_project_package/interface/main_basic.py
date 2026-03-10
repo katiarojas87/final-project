@@ -9,6 +9,7 @@ from sklearn.model_selection import train_test_split
 from final_project_package.ml_logic.data_clean import initialize_clip, data_clean, add_clip_columns, average_scoring
 from final_project_package.ml_logic.model import initialize_model, train_model, evaluate_model
 from final_project_package.ml_logic.preprocessor_pipeline import get_fitted_preprocessor
+from scipy.stats import zscore
 
 def load_data(path_to_project: str, nr_batches):
 
@@ -100,12 +101,30 @@ def load_data(path_to_project: str, nr_batches):
 
 
 def preprocess(
-        path_to_project: str,
-        split_ratio: float = 0.3, # 0.3 default test_size
-
+    path_to_project: str,
+    split_ratio: float = 0.3, # 0.3 default test_size
     ):
+
     data_path = pathlib.Path(path_to_project)
     data = pd.read_csv(data_path / "data_dump/listings_with_scores.csv")
+
+    def fix_floating(row):
+        if row['floor_number'] > row['floors_total']:
+            row['floors_total'] = row['floor_number'] * 2
+
+        return row
+
+    data = data.apply(fix_floating, axis=1)
+
+    data['price_zscore'] = zscore(data['price_man_yen'])
+    data = data[data['price_zscore'].abs() <= 3]
+    data = data.drop('price_zscore', axis=1)
+
+    data["building_period"] = pd.cut(
+        data["year_built"],
+        bins=[0, 1980, 2000, float("inf")],
+        labels=["pre 1981", "1981 to 2000", "post 2000"]
+    )
 
     X = data.drop(columns=["price_man_yen"]).copy()
     y = data["price_man_yen"]

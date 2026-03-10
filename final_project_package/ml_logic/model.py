@@ -6,6 +6,7 @@ start = time.perf_counter()
 
 from sklearn.linear_model import LinearRegression
 from sklearn.neighbors import KNeighborsRegressor
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import cross_validate
 from sklearn.metrics import root_mean_squared_error, mean_squared_error
 
@@ -19,7 +20,8 @@ def initialize_model():
     Initialize the model
     """
     #model = LinearRegression()
-    model = KNeighborsRegressor()
+    #model = KNeighborsRegressor()
+    model = RandomForestRegressor(random_state=42, max_depth= None, n_estimators= 100)
 
     print("✅ Model initialized")
 
@@ -66,9 +68,9 @@ def evaluate_model(
     y_test = np.expm1(y_test_log)
     y_pred = np.expm1(y_pred_log)
 
-    rmse = root_mean_squared_error(y_test_log, y_pred_log)
-    mse = mean_squared_error(y_test_log, y_pred_log)
+    rmse = root_mean_squared_error(y_test, y_pred)
+    mse = mean_squared_error(y_test, y_pred)
 
-    print(f"✅ Model evaluated, MSE: {round(mse, 7)}")
+    print(f"✅ Model evaluated, MSE: {round(mse, 7)} and RMSE: {round(rmse, 7)}")
 
-    return mse
+    return mse, rmse
