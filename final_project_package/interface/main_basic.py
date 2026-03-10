@@ -3,13 +3,55 @@ import numpy as np
 import pathlib
 import os
 import pickle
+import requests
 from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split
+from tqdm import tqdm
 
 from final_project_package.ml_logic.data_clean import initialize_clip, data_clean, add_clip_columns, average_scoring
 from final_project_package.ml_logic.model import initialize_model, train_model, evaluate_model
 from final_project_package.ml_logic.preprocessor_pipeline import get_fitted_preprocessor
 from scipy.stats import zscore
+
+def add_geo_onetimeuse():
+    data = pd.read_csv("data_dump/listings_with_scores.csv")
+    data["address"]= data["address"].str.replace(' [ ■ 周辺環境 ]', '', regex=False)
+
+    def geocode_gsi(address):
+        """Geocode a Japanese address using Japan's free GSI API."""
+        try:
+            url = "https://msearch.gsi.go.jp/address-search/AddressSearch"
+            res = requests.get(url, params={"q": address}, timeout=5)
+            result = res.json()
+
+            if result:
+                lon, lat = result[0]["geometry"]["coordinates"]
+                return lat, lon
+        except Exception:
+            pass
+
+        return None, None
+
+    if "latitude" not in data.columns:
+        data["latitude"] = pd.NA
+    if "longitude" not in data.columns:
+        data["longitude"] = pd.NA
+
+    mask = data["latitude"].isna() | data["longitude"].isna()
+
+    coords = [
+        geocode_gsi(addr)
+        for addr in tqdm(data.loc[mask, "address"], desc="Geocoding")
+    ]
+
+    data.loc[mask, ["latitude", "longitude"]] = coords
+
+    print(data[["address", "latitude", "longitude"]].head())
+
+    data.to_csv("data_dump/listings_with_scores.csv", index=False)
+    print("listings_with_scores.csv updated")
+
+    return data
 
 def load_data(path_to_project: str, nr_batches):
 
@@ -247,7 +289,8 @@ def pred(
 
 
 if __name__ == '__main__':
-    load_data(".", 50)
+    add_geo_onetimeuse()
+#   load_data(".", 50)
 #    preprocess(".", 0.3)
 #    train(".")
 #    evaluate(".")
