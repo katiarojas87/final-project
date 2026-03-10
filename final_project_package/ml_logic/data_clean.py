@@ -5,7 +5,9 @@ import pathlib
 import pandas as pd
 import numpy as np
 import matplotlib as mlpt
+import requests
 import torch
+import tqdm
 from transformers import pipeline
 import re
 from scipy.stats import zscore
@@ -46,6 +48,28 @@ def parse_layout(X):
         "has_S": has_s
     })
 
+def geocode_gsi(address):
+    """Geocode a Japanese address using Japan's free GSI API."""
+    try:
+        url = "https://msearch.gsi.go.jp/address-search/AddressSearch"
+        res = requests.get(url, params={"q": address}, timeout=5)
+        result = res.json()
+        if result:
+            lon, lat = result[0]["geometry"]["coordinates"]
+            return lat, lon
+    except Exception as e:
+        pass
+    return None, None
+
+def attach_long_lat(data):
+    tqdm.pandas()  # enables progress bar
+
+    data[["lat", "lon"]] = data["address"].progress_apply(
+        lambda addr: pd.Series(geocode_gsi(addr))
+    )
+
+    print(data[["address", "lat", "lon"]].head())
+
 def initialize_clip():
     clip = pipeline(
         task = "zero-shot-image-classification",
@@ -77,6 +101,8 @@ def data_clean(listing_data, images_data):
     listing_data['price_zscore'] = zscore(listing_data['price_man_yen'])
     listing_data = listing_data[listing_data['price_zscore'].abs() <= 3]
     listing_data = listing_data.drop('price_zscore', axis=1)
+    # attach long lat to listings_data
+    listing_data = attach_long_lat(listing_data)
 
     return listing_data, images_data
 
