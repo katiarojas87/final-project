@@ -11,12 +11,12 @@ def get_clip():
 
 @st.cache_resource
 def get_images():
-    df = pd.read_csv(Path.cwd() / "data_dump/images_cleaned_embedding.csv", nrows=3000)
+    df = pd.read_csv(Path.cwd() / "data_dump/images_cleaned_embedding.csv", nrows=4000)
     return df[df["embedding"] != "[]"]
 
 @st.cache_resource
 def get_listings():
-    df = pd.read_csv(Path.cwd() / "data_dump/listings_with_scores.csv")
+    df = pd.read_csv(Path.cwd() / "data_dump/listings_with_scores_pred.csv")
     images_df = get_images()
     source_id = images_df["source_id"]
     df = df[df["source_id"].isin(source_id)]
@@ -34,17 +34,19 @@ listings_df = get_listings()
 
 '''
 # UrbanScore
-### Search for Top 10 listings with specific properties in their images
 '''
 
-query = st.text_input("Image Query", value="")
+'''
+### Search for properties in their images
+'''
+query = st.text_input("Write a prompt, e.g. kitchen with island", value="")
 
 '''
 ### Set additional filters
 '''
 col1, col2, col3 = st.columns(3)
 with col1:
-    variable = st.selectbox("Numeric variable", ["price_man_yen", "area_sqm", "year_built", "floor_number"])
+    variable = st.selectbox("Choose variable", ["price_man_yen", "area_sqm", "year_built", "floor_number"])
 
 with col2:
     min_value = st.number_input("Minimum value", min_value=0.0, max_value=100000000.0, step=0.1)
@@ -105,11 +107,15 @@ fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
 st.plotly_chart(fig, use_container_width=True)
 
 
+
 '''
 ## Listings
 
 '''
-
+'''
+### Show Good Deals only?
+'''
+show_all = st.selectbox("", ["Show all", "Good Deal only"])
 
 # --- Card Styling ---
 st.markdown("""

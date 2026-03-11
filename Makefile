@@ -26,7 +26,10 @@ run_evaluate:
 run_pred:
 	python -c 'from final_project_package.interface.main_basic import pred; import pathlib; pred(str(pathlib.Path.cwd()))'
 
-run_all: run_load_data run_preprocess run_train run_evaluate run_pred
+run_add_pred:
+	python -c 'from final_project_package.interface.main_basic import add_prediction; import pathlib; add_prediction(str(pathlib.Path.cwd()))'
+
+run_all: run_preprocess run_train run_evaluate run_add_pred
 
 #run_workflow:
 #	PREFECT__LOGGING__LEVEL=${PREFECT_LOG_LEVEL} python -m final_project.interface.workflow

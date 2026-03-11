@@ -21,8 +21,8 @@ def initialize_model():
     """
     #model = LinearRegression()
     #model = KNeighborsRegressor()
-    model = RandomForestRegressor(random_state=42, max_depth= None, n_estimators= 100)
-
+    #model = RandomForestRegressor(random_state=42, max_depth= None, n_estimators= 100)
+    model = RandomForestRegressor(random_state=42, bootstrap = False, max_depth = 20, max_features = 'sqrt', min_samples_leaf = 1, min_samples_split = 2, n_estimators = 200)
     print("✅ Model initialized")
 
     return model

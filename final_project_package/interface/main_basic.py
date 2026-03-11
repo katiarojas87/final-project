@@ -104,7 +104,6 @@ def add_embedding(path_to_project: str, nr_batches):
         else:
             image_df.to_csv(data_path / "data_dump/images_cleaned_embedding.csv", index = False)
 
-
     return image_df
 
 
@@ -343,11 +342,39 @@ def pred(
     return y_pred
 
 
+def add_prediction(path_to_project: str):
+
+    # Get the path of the current folder
+    data_path = pathlib.Path(path_to_project)
+
+    # import listings.csv
+    listings_df = pd.read_csv(data_path / "data_dump/listings_with_avg_income.csv")
+    X = listings_df.drop(columns=["price_man_yen"]).copy()
+    y = listings_df["price_man_yen"]
+
+    # initialize clip
+    y_pred = pred(path_to_project, X)
+
+    listings_df["predicted_price"] = y_pred
+
+    print("added prediction...")
+
+    # save csv
+    os.makedirs("data_dump", exist_ok=True)
+    file_exists = os.path.isfile(data_path / "data_dump/listings_with_scores_pred.csv")
+    if file_exists:
+        listings_df.to_csv(data_path / "data_dump/listings_with_scores_pred.csv", mode = "a", header=False, index=False)
+    else:
+        listings_df.to_csv(data_path / "data_dump/listings_with_scores_pred.csv", index = False)
+
+
+    return listings_df
+
 if __name__ == '__main__':
 #    add_geo_onetimeuse()
-    add_embedding(".", 50)
+#    add_embedding(".", 50)
 #    load_data(".", 50)
-#    preprocess(".", 0.3)
+    preprocess(".", 0.3)
 #    train(".")
 #    evaluate(".")
 #    pred()
