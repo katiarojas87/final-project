@@ -33,6 +33,9 @@ def mean_brightness_name(transformer, input_features):
 def mean_condition_name(transformer, input_features):
     return ["mean_condition"]
 
+def mean_spacioussness_name(transformer, input_features):
+    return ["mean_spacioussness"]
+
 
 mean_luxury_transformer = FunctionTransformer(
     aggregate_columns,
@@ -47,6 +50,11 @@ mean_brightness_transformer = FunctionTransformer(
 mean_condition_transformer = FunctionTransformer(
     aggregate_columns,
     feature_names_out=mean_condition_name
+)
+
+mean_spacioussness_transformer = FunctionTransformer(
+    aggregate_columns,
+    feature_names_out=mean_spacioussness_name
 )
 
 
@@ -95,7 +103,9 @@ def get_fitted_preprocessor(X_train, y_train):
         ("mean_brightness_transformer", mean_brightness_transformer,
          ["brightness_bathroom", "brightness_bedroom", "brightness_kitchen", "brightness_living_room", "brightness_toilet"]),
         ("mean_condition_transformer", mean_condition_transformer,
-         ["condition_bathroom", "condition_bedroom", "condition_kitchen", "condition_living_room", "condition_toilet"])
+         ["condition_bathroom", "condition_bedroom", "condition_kitchen", "condition_living_room", "condition_toilet"]),
+        # ('mean_spacioussness_transformer', mean_spacioussness_transformer,
+        #  ["spaciousness_bathroom","spaciousness_bedroom","spaciousness_kitchen","spaciousness_living_room","spaciousness_toilet"])
     ], remainder="drop")
 
     print("\nPreprocessing features...")
