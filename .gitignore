@@ -208,8 +208,10 @@ __marimo__/
 
 raw_data/
 data_dump/
+frontend/screenshots/
 .DS_Store
 
 #assessment tool
 secrets/
 lance_problem_solving.ipynb
+real-estate.ipynb

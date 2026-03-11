@@ -5,9 +5,12 @@ import pathlib
 import pandas as pd
 import numpy as np
 import matplotlib as mlpt
+import requests
 import torch
+from tqdm import tqdm
 from transformers import pipeline
 import re
+from scipy.stats import zscore
 
 _layout_re = re.compile(r"^\s*(\d+)\s*(S?)\s*(LDK|DK|K|R)\s*$", re.IGNORECASE)
 
@@ -45,6 +48,28 @@ def parse_layout(X):
         "has_S": has_s
     })
 
+def geocode_gsi(address):
+    """Geocode a Japanese address using Japan's free GSI API."""
+    try:
+        url = "https://msearch.gsi.go.jp/address-search/AddressSearch"
+        res = requests.get(url, params={"q": address}, timeout=5)
+        result = res.json()
+        if result:
+            lon, lat = result[0]["geometry"]["coordinates"]
+            return lat, lon
+    except Exception as e:
+        pass
+    return None, None
+
+def attach_long_lat(data):
+    tqdm.pandas()  # enables progress bar
+
+    data[["lat", "lon"]] = data["address"].progress_apply(
+        lambda addr: pd.Series(geocode_gsi(addr))
+    )
+
+    print(data[["address", "lat", "lon"]].head())
+
 def initialize_clip():
     clip = pipeline(
         task = "zero-shot-image-classification",
@@ -60,17 +85,24 @@ def data_clean(listing_data, images_data):
     then removes listings with less than 5 images
     then removes images that were associated with removed listings
     """
+    #drop na and remove listings with less than 5 images
     listing_data = listing_data.dropna()
     images_data = images_data.dropna()
     listing_data = listing_data[listing_data['image_count'] >= 5]
     images_data = images_data[images_data['source_id'].isin(listing_data['source_id'])]
-    listing_data.apply(fix_floating, axis=1)
-
+    listing_data = listing_data.apply(fix_floating, axis=1)
+    #parse layout into base layout and number or rooms
     layout = listing_data['layout']
     layout_parsed = parse_layout(layout)
     layout_parsed['has_S'].value_counts()
     layout_parsed = layout_parsed.drop(['has_S'], axis= 1)
     listing_data = listing_data.reset_index().join(layout_parsed).drop(['layout'], axis=1)
+    # removing price outliers
+    listing_data['price_zscore'] = zscore(listing_data['price_man_yen'])
+    listing_data = listing_data[listing_data['price_zscore'].abs() <= 3]
+    listing_data = listing_data.drop('price_zscore', axis=1)
+    # attach long lat to listings_data
+    listing_data = attach_long_lat(listing_data)
 
     return listing_data, images_data
 

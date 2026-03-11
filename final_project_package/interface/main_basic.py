@@ -3,12 +3,110 @@ import numpy as np
 import pathlib
 import os
 import pickle
+import requests
 from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split
+from tqdm import tqdm
 
 from final_project_package.ml_logic.data_clean import initialize_clip, data_clean, add_clip_columns, average_scoring
 from final_project_package.ml_logic.model import initialize_model, train_model, evaluate_model
 from final_project_package.ml_logic.preprocessor_pipeline import get_fitted_preprocessor
+from final_project_package.embeddings.embeddings import load_clip_model, get_image_embeddings
+
+from scipy.stats import zscore
+
+def add_geo_onetimeuse():
+    data = pd.read_csv("data_dump/listings_with_scores.csv")
+    data["address"]= data["address"].str.replace(' [ ■ 周辺環境 ]', '', regex=False)
+
+    def geocode_gsi(address):
+        """Geocode a Japanese address using Japan's free GSI API."""
+        try:
+            url = "https://msearch.gsi.go.jp/address-search/AddressSearch"
+            res = requests.get(url, params={"q": address}, timeout=5)
+            result = res.json()
+
+            if result:
+                lon, lat = result[0]["geometry"]["coordinates"]
+                return lat, lon
+        except Exception:
+            pass
+
+        return None, None
+
+    if "latitude" not in data.columns:
+        data["latitude"] = pd.NA
+    if "longitude" not in data.columns:
+        data["longitude"] = pd.NA
+
+    mask = data["latitude"].isna() | data["longitude"].isna()
+
+    coords = [
+        geocode_gsi(addr)
+        for addr in tqdm(data.loc[mask, "address"], desc="Geocoding")
+    ]
+
+    data.loc[mask, ["latitude", "longitude"]] = coords
+
+    print(data[["address", "latitude", "longitude"]].head())
+
+    data.to_csv("data_dump/listings_with_scores.csv", index=False)
+    print("listings_with_scores.csv updated")
+
+    return data
+
+
+def add_embedding(path_to_project: str, nr_batches):
+
+    # Get the path of the current folder
+    data_path = pathlib.Path(path_to_project)
+
+    # import images.csv
+    image_full = pd.read_csv(data_path / "data_dump/images_cleaned.csv")
+
+    # import listings.csv
+    listings_full = pd.read_csv(data_path / "data_dump/listings_cleaned.csv")
+    source_id = listings_full["source_id"]
+    image_full = image_full[image_full["source_id"].isin(source_id)]
+
+    image_full["image_path"] = image_full["image_name"].apply(lambda x: \
+        str(data_path / "raw_data/suumo_images" / str(x).split("_")[0] / x))
+
+    # initialize clip
+    model, processor = load_clip_model()
+    print("clip initialized")
+
+    previous_listing = 0
+    for listing in np.linspace(len(listings_full)/nr_batches,len(listings_full), nr_batches).astype("int"):
+        start = previous_listing
+        stop = listing
+
+        previous_listing = listing
+
+        # df into batch
+        listings_df = listings_full[start:stop]\
+            .reset_index().drop(columns="index")
+        source_id = listings_df["source_id"]
+        image_df = image_full[image_full["source_id"].isin(source_id)]\
+            .reset_index().drop(columns="index")
+
+        # add embedding column
+        image_df["embedding"] = image_df["image_path"].apply(lambda x: \
+            get_image_embeddings(model, processor, [x]))
+
+        print("Generated embeddings...")
+
+        # save csv
+        os.makedirs("data_dump", exist_ok=True)
+        file_exists = os.path.isfile(data_path / "data_dump/images_cleaned_embedding.csv")
+        if file_exists:
+            image_df.to_csv(data_path / "data_dump/images_cleaned_embedding.csv", mode = "a", header=False, index=False)
+        else:
+            image_df.to_csv(data_path / "data_dump/images_cleaned_embedding.csv", index = False)
+
+
+    return image_df
+
 
 def load_data(path_to_project: str, nr_batches):
 
@@ -100,12 +198,30 @@ def load_data(path_to_project: str, nr_batches):
 
 
 def preprocess(
-        path_to_project: str,
-        split_ratio: float = 0.3, # 0.3 default test_size
-
+    path_to_project: str,
+    split_ratio: float = 0.3, # 0.3 default test_size
     ):
+
     data_path = pathlib.Path(path_to_project)
     data = pd.read_csv(data_path / "data_dump/listings_with_scores.csv")
+
+    def fix_floating(row):
+        if row['floor_number'] > row['floors_total']:
+            row['floors_total'] = row['floor_number'] * 2
+
+        return row
+
+    data = data.apply(fix_floating, axis=1)
+
+    data['price_zscore'] = zscore(data['price_man_yen'])
+    data = data[data['price_zscore'].abs() <= 3]
+    data = data.drop('price_zscore', axis=1)
+
+    data["building_period"] = pd.cut(
+        data["year_built"],
+        bins=[0, 1980, 2000, float("inf")],
+        labels=["pre 1981", "1981 to 2000", "post 2000"]
+    )
 
     X = data.drop(columns=["price_man_yen"]).copy()
     y = data["price_man_yen"]
@@ -228,7 +344,9 @@ def pred(
 
 
 if __name__ == '__main__':
-    load_data(".", 50)
+#    add_geo_onetimeuse()
+    add_embedding(".", 50)
+#    load_data(".", 50)
 #    preprocess(".", 0.3)
 #    train(".")
 #    evaluate(".")

@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 
 # pipeline
+from sklearn.discriminant_analysis import StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 
@@ -32,6 +33,9 @@ def mean_brightness_name(transformer, input_features):
 def mean_condition_name(transformer, input_features):
     return ["mean_condition"]
 
+def mean_spacioussness_name(transformer, input_features):
+    return ["mean_spacioussness"]
+
 
 mean_luxury_transformer = FunctionTransformer(
     aggregate_columns,
@@ -46,6 +50,11 @@ mean_brightness_transformer = FunctionTransformer(
 mean_condition_transformer = FunctionTransformer(
     aggregate_columns,
     feature_names_out=mean_condition_name
+)
+
+mean_spacioussness_transformer = FunctionTransformer(
+    aggregate_columns,
+    feature_names_out=mean_spacioussness_name
 )
 
 
@@ -69,17 +78,34 @@ def get_fitted_preprocessor(X_train, y_train):
         ))
     ])
 
+    building_period_pipe = Pipeline([
+        ("imputer", SimpleImputer(strategy="most_frequent")),
+        ("ordinal", OrdinalEncoder(
+            categories=[["pre 1981", "1981 to 2000", "post 2000"]],
+            handle_unknown="use_encoded_value",
+            unknown_value=-1
+        ))
+    ])
+
+    station_pipe = Pipeline([
+        ("target_encoder", TargetEncoder(target_type="continuous")),
+        ("scaler", RobustScaler())
+    ])
+
     final_preprocessor = ColumnTransformer([
-        ("keep_rooms", "passthrough", ["rooms_num"]),
+        ("keep_rooms", "passthrough", ["rooms_num","latitude", "longitude"]),
+        ("station_transformer", station_pipe, ["nearest_station"]),
         ("num_transformer", num_transformer, num_features),
-        ("station_transformer", TargetEncoder(target_type="continuous"), ["nearest_station"]),
         ("ordinal_transformer", base_layout_pipe, ["base_layout"]),
+        ('building_period_transformer', building_period_pipe, ['building_period']),
         ("mean_luxury_transformer", mean_luxury_transformer,
          ["luxury_bathroom", "luxury_bedroom", "luxury_kitchen", "luxury_living_room", "luxury_toilet"]),
         ("mean_brightness_transformer", mean_brightness_transformer,
          ["brightness_bathroom", "brightness_bedroom", "brightness_kitchen", "brightness_living_room", "brightness_toilet"]),
         ("mean_condition_transformer", mean_condition_transformer,
-         ["condition_bathroom", "condition_bedroom", "condition_kitchen", "condition_living_room", "condition_toilet"])
+         ["condition_bathroom", "condition_bedroom", "condition_kitchen", "condition_living_room", "condition_toilet"]),
+        # ('mean_spacioussness_transformer', mean_spacioussness_transformer,
+        #  ["spaciousness_bathroom","spaciousness_bedroom","spaciousness_kitchen","spaciousness_living_room","spaciousness_toilet"])
     ], remainder="drop")
 
     print("\nPreprocessing features...")
