@@ -5,6 +5,9 @@ reinstall_package:
 	@pip uninstall -y final_project_package || :
 	@pip install -e .
 
+streamlit:
+	-@streamlit run frontend.app.py
+
 run_load_data:
 	python -c 'from final_project_package.interface.main_basic import load_data; import pathlib; load_data(str(pathlib.Path.cwd()), 50)'
 
