@@ -5,8 +5,14 @@ reinstall_package:
 	@pip uninstall -y final_project_package || :
 	@pip install -e .
 
+streamlit:
+	-@streamlit run frontend.app.py
+
 run_load_data:
 	python -c 'from final_project_package.interface.main_basic import load_data; import pathlib; load_data(str(pathlib.Path.cwd()), 50)'
+
+run_embeddings:
+	python -c 'from final_project_package.interface.main_basic import add_embedding; import pathlib; add_embedding(str(pathlib.Path.cwd()), 50)'
 
 run_preprocess:
 	python -c 'from final_project_package.interface.main_basic import preprocess; import pathlib; preprocess(str(pathlib.Path.cwd()), 0.3)'

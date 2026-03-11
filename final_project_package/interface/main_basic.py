@@ -11,6 +11,8 @@ from tqdm import tqdm
 from final_project_package.ml_logic.data_clean import initialize_clip, data_clean, add_clip_columns, average_scoring
 from final_project_package.ml_logic.model import initialize_model, train_model, evaluate_model
 from final_project_package.ml_logic.preprocessor_pipeline import get_fitted_preprocessor
+from final_project_package.embeddings.embeddings import load_clip_model, get_image_embeddings
+
 from scipy.stats import zscore
 
 def add_geo_onetimeuse():
@@ -52,6 +54,59 @@ def add_geo_onetimeuse():
     print("listings_with_scores.csv updated")
 
     return data
+
+
+def add_embedding(path_to_project: str, nr_batches):
+
+    # Get the path of the current folder
+    data_path = pathlib.Path(path_to_project)
+
+    # import images.csv
+    image_full = pd.read_csv(data_path / "data_dump/images_cleaned.csv")
+
+    # import listings.csv
+    listings_full = pd.read_csv(data_path / "data_dump/listings_cleaned.csv")
+    source_id = listings_full["source_id"]
+    image_full = image_full[image_full["source_id"].isin(source_id)]
+
+    image_full["image_path"] = image_full["image_name"].apply(lambda x: \
+        str(data_path / "raw_data/suumo_images" / str(x).split("_")[0] / x))
+
+    # initialize clip
+    model, processor = load_clip_model()
+    print("clip initialized")
+
+    previous_listing = 0
+    for listing in np.linspace(len(listings_full)/nr_batches,len(listings_full), nr_batches).astype("int"):
+        start = previous_listing
+        stop = listing
+
+        previous_listing = listing
+
+        # df into batch
+        listings_df = listings_full[start:stop]\
+            .reset_index().drop(columns="index")
+        source_id = listings_df["source_id"]
+        image_df = image_full[image_full["source_id"].isin(source_id)]\
+            .reset_index().drop(columns="index")
+
+        # add embedding column
+        image_df["embedding"] = image_df["image_path"].apply(lambda x: \
+            get_image_embeddings(model, processor, [x]))
+
+        print("Generated embeddings...")
+
+        # save csv
+        os.makedirs("data_dump", exist_ok=True)
+        file_exists = os.path.isfile(data_path / "data_dump/images_cleaned_embedding.csv")
+        if file_exists:
+            image_df.to_csv(data_path / "data_dump/images_cleaned_embedding.csv", mode = "a", header=False, index=False)
+        else:
+            image_df.to_csv(data_path / "data_dump/images_cleaned_embedding.csv", index = False)
+
+
+    return image_df
+
 
 def load_data(path_to_project: str, nr_batches):
 
@@ -289,8 +344,9 @@ def pred(
 
 
 if __name__ == '__main__':
-    add_geo_onetimeuse()
-#   load_data(".", 50)
+#    add_geo_onetimeuse()
+    add_embedding(".", 50)
+#    load_data(".", 50)
 #    preprocess(".", 0.3)
 #    train(".")
 #    evaluate(".")
