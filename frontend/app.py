@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from pathlib import Path
+import plotly.express as px
 from final_project_package.embeddings.embeddings import load_clip_model, get_text_embeddings, get_similarity
 st.set_page_config(layout="wide")
 
@@ -33,17 +34,28 @@ listings_df = get_listings()
 
 '''
 # UrbanScore
+### Search for Top 10 listings with specific properties in their images
 '''
+
+query = st.text_input("Image Query", value="")
+
+'''
+### Set additional filters
+'''
+col1, col2, col3 = st.columns(3)
+with col1:
+    variable = st.selectbox("Numeric variable", ["price_man_yen", "area_sqm", "year_built", "floor_number"])
+
+with col2:
+    min_value = st.number_input("Minimum value", min_value=0.0, max_value=100000000.0, step=0.1)
+
+with col3:
+    max_value = st.number_input("Maximum value", min_value=0.0, max_value=100000000.0, step=0.1)
 
 st.markdown('''
 
 ''')
 
-query = st.text_input("Image Query", value="")
-
-variable = st.selectbox("Variable", list(listings_df.columns))
-
-min_value = st.number_input("Minimum value of Variable", min_value=0.0, max_value=100000000.0, value=0.0, step=0.1)
 
 # Text embedding
 text_embedding = get_text_embeddings(model, processor, [query])
@@ -60,16 +72,37 @@ else:
     listings = listings_df[listings_df["source_id"].isin(source_id)]
 
 
+
+# implement map
 df = pd.DataFrame({
     "lon": listings["longitude"],
     "lat": listings["latitude"]
 })
 
-st.write(f"Max nr of listings : {len(listings_df)}")
 st.write(f"Nr of listings : {len(listings)}")
-st.write(f"Query : {query}")
 
-st.map(df)
+#st.map(df)
+
+
+# Create the map with hover data
+fig = px.scatter_mapbox(
+    listings,
+    lat="latitude",
+    lon="longitude",
+    hover_name="address",       # Column to display on hover
+    hover_data=["price_man_yen", "area_sqm"], # Additional data to display on hover
+    zoom=10,
+    height=400,
+    mapbox_style="carto-positron",
+    size = "price_man_yen",
+    size_max=10,
+)
+
+# Customize map layout
+fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+
+# Display the map in Streamlit
+st.plotly_chart(fig, use_container_width=True)
 
 
 '''
