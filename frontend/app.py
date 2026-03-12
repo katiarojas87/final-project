@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from pathlib import Path
 import plotly.express as px
-from final_project_package.embeddings.embeddings import load_clip_model, get_text_embeddings, get_similarity
+from embeddings import load_clip_model, get_text_embeddings, get_similarity
 import base64
 
 @st.cache_resource
@@ -20,12 +20,12 @@ def get_clip():
 
 @st.cache_resource
 def get_images():
-    df = pd.read_csv(Path.cwd() / "data_dump/images_cleaned_embedding.csv", nrows=4000)
+    df = pd.read_csv(Path.cwd() / "frontend/images_cleaned_embedding.csv", nrows=4000)
     return df[df["embedding"] != "[]"]
 
 @st.cache_resource
 def get_listings():
-    df = pd.read_csv(Path.cwd() / "data_dump/listings_with_deal.csv")
+    df = pd.read_csv(Path.cwd() / "frontend/listings_with_deal.csv")
     images_df = get_images()
     source_id = images_df["source_id"]
     df = df[df["source_id"].isin(source_id)]
