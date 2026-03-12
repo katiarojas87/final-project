@@ -20,7 +20,7 @@ def get_clip():
 
 @st.cache_resource
 def get_images():
-    df = pd.read_csv(Path.cwd() / "frontend/images_cleaned_embedding.csv", nrows=4000)
+    df = pd.read_csv(Path.cwd() / "frontend/images_cleaned_embedding.csv", nrows=8000)
     return df[df["embedding"] != "[]"]
 
 @st.cache_resource
@@ -29,6 +29,9 @@ def get_listings():
     images_df = get_images()
     source_id = images_df["source_id"]
     df = df[df["source_id"].isin(source_id)]
+    df["difference"] = (df["predicted_price"] - df["price_man_yen"])/df["price_man_yen"]
+    df = df[df["difference"] != 0.0]
+    df.loc[df["difference"] < 0.05, "deal"] = "Regular Price"
 
     # add first images
     img = images_df[images_df["room_type"] != "floor plan"]
@@ -41,18 +44,17 @@ model, processor = get_clip()
 images_df = get_images()
 listings_df = get_listings()
 
-
 '''
 # UrbanScore
 '''
 
 '''
-### Search for properties in their images
+### Image search
 '''
 query = st.text_input("Write a prompt, e.g. kitchen with island", value="")
 
 '''
-### Set additional filters
+### Set filters
 '''
 col1, col2, col3 = st.columns(3)
 
@@ -65,6 +67,9 @@ with col2:
 with col3:
     min_year = st.number_input("Minimum year built", min_value=1960, max_value=2024, step=1)
 
+show_all = st.selectbox("Show Good Deals only?", ["Show all", "Good Deal only"])
+
+
 st.markdown('''
 
 ''')
@@ -74,9 +79,14 @@ listings_df = listings_df[listings_df["price_man_yen"] <= max_price]
 listings_df = listings_df[listings_df["area_sqm"] >= min_area]
 listings_df = listings_df[listings_df["year_built"] >= min_year]
 
+if show_all == "Good Deal only":
+    listings_df = listings_df[listings_df["deal"] == "Good Deal"]
+
 # Text embedding
 text_embedding = get_text_embeddings(model, processor, [query])
 
+source_id = listings_df["source_id"]
+images_df = images_df[images_df["source_id"].isin(source_id)]
 similarity = images_df["embedding"].apply(lambda x: \
         get_similarity(x, text_embedding)).astype("float").to_frame()
 
@@ -90,41 +100,14 @@ else:
 
 listings = listings.reset_index().drop(columns="index")
 
-# implement map
+# Nr of listings shown
 st.write(f"Nr of listings : {len(listings)}")
-
-# Create the map with hover data
-fig = px.scatter_mapbox(
-    listings,
-    lat="latitude",
-    lon="longitude",
-    hover_name="address",       # Column to display on hover
-    hover_data=["price_man_yen", "area_sqm"], # Additional data to display on hover
-    zoom=10,
-    height=400,
-    mapbox_style="carto-positron",
-    color = "deal",
-    size = "price_man_yen",
-    size_max=10,
-)
-
-# Customize map layout
-fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
-
-# Display the map in Streamlit
-st.plotly_chart(fig, use_container_width=True)
-
 
 
 '''
 ## Listings
 
 '''
-show_all = st.selectbox("Show Good Deals only?", ["Show all", "Good Deal only"])
-
-if show_all == "Good Deal only":
-    listings = listings[listings["deal"] == "Good Deal"]
-    listings = listings.reset_index().drop(columns="index")
 
 # --- Card Styling ---
 st.markdown("""
@@ -134,13 +117,13 @@ st.markdown("""
     padding: 10px;
     margin-bottom: 20px;
     background-color: #f9f9f9;
-    box-shadow: 0px 3px 8px rgba(0,0,0,0.1);
+
 }
 .image-container {
     width: 100%;
     height: 220px;
     overflow: hidden;
-    border-radius: 10px;
+
 }
 .image-container img {
     width: 100%;
@@ -160,24 +143,29 @@ st.markdown("""
 .container {
   display: flex; /* Makes the container a flex container */
   gap: 20px; /* Adds space between columns */
+  border-width: 10px;
 }
-
+.good {
+    background: #50C867;
+    border-width: 10px;
+    border-color: rgba(1, 153, 0, 0.5);
+}
 .column {
   padding: 15px;
 }
 .left {
-    width: 70%; /* Sets the width of the first column */
+    width: 60%; /* Sets the width of the first column */
 }
 
 .right {
-    width: 30%; /* Sets the width of the second column */
+    width: 40%; /* Sets the width of the second column */
 }
 .price {
     font-size: 22px;
     font-weight: bold;
 }
 .logo img {
-    height: 60px;
+    height: 120px;
 }
 .meta {
     color: #555;
@@ -195,6 +183,11 @@ for i, row in listings.iterrows():
         f'<img src="data:image/png;base64,{logo_base64}">'
         if row.get("deal") == "Good Deal"
         else '<div class="meta"></div>'
+    )
+    container_def = (
+        f'<div class="container good">'
+        if row.get("deal") == "Good Deal"
+        else f'<div class="container">'
     )
 
     col = cols[i % 3]
@@ -218,10 +211,11 @@ for i, row in listings.iterrows():
 
         st.markdown(
             f"""
-            <div class="container">
+            {container_def}
                 <div class="column left">
                     <div class="price">{row.get('price_man_yen','')} 万円</div>
                     <div class="meta">{row.get('predicted_price','')} 万円 (predicted)</div>
+                    <div class="meta">built in {row.get('year_built','')}</div>
                     <div class="meta">{row.get('area_sqm','')} m²</div>
                     <div class="meta">{row.get('walk_minutes','')} min to {row.get('nearest_station','')}</div>
                 </div>
@@ -236,3 +230,30 @@ for i, row in listings.iterrows():
         )
 
         st.markdown('</div>', unsafe_allow_html=True)
+
+
+
+'''
+## Location
+
+'''
+# Create the map with hover data
+fig = px.scatter_mapbox(
+    listings,
+    lat="latitude",
+    lon="longitude",
+    hover_name="address",       # Column to display on hover
+    hover_data=["price_man_yen", "area_sqm"], # Additional data to display on hover
+    zoom=10,
+    height=400,
+    mapbox_style="carto-positron",
+    color = "deal",
+    size = "price_man_yen",
+    size_max=10,
+)
+
+# Customize map layout
+fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+
+# Display the map in Streamlit
+st.plotly_chart(fig, use_container_width=True)
