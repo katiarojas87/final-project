@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from pathlib import Path
 import plotly.express as px
-from final_project_package.embeddings.embeddings import load_clip_model, get_text_embeddings, get_similarity
+from embeddings import load_clip_model, get_text_embeddings, get_similarity
 import base64
 
 @st.cache_resource
