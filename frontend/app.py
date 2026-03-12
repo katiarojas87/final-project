@@ -3,6 +3,15 @@ import pandas as pd
 from pathlib import Path
 import plotly.express as px
 from final_project_package.embeddings.embeddings import load_clip_model, get_text_embeddings, get_similarity
+import base64
+
+@st.cache_resource
+def get_base64_image(path):
+    with open(path, "rb") as img_file:
+        return base64.b64encode(img_file.read()).decode()
+
+logo_base64 = get_base64_image(Path.cwd()/"frontend/GoodDeal.png")
+
 st.set_page_config(layout="wide")
 
 @st.cache_resource
@@ -16,7 +25,7 @@ def get_images():
 
 @st.cache_resource
 def get_listings():
-    df = pd.read_csv(Path.cwd() / "data_dump/listings_with_scores_pred.csv")
+    df = pd.read_csv(Path.cwd() / "data_dump/listings_with_deal.csv")
     images_df = get_images()
     source_id = images_df["source_id"]
     df = df[df["source_id"].isin(source_id)]
@@ -25,6 +34,7 @@ def get_listings():
     img = images_df[images_df["room_type"] != "floor plan"]
     first_images = img.drop_duplicates("source_id")
     df = df.merge(first_images, on="source_id", how="left")
+
     return df
 
 model, processor = get_clip()
@@ -45,19 +55,24 @@ query = st.text_input("Write a prompt, e.g. kitchen with island", value="")
 ### Set additional filters
 '''
 col1, col2, col3 = st.columns(3)
+
 with col1:
-    variable = st.selectbox("Choose variable", ["price_man_yen", "area_sqm", "year_built", "floor_number"])
+    max_price = st.number_input("Maximum price 万円", min_value=1000, max_value=50000, value=10000, step=1)
 
 with col2:
-    min_value = st.number_input("Minimum value", min_value=0.0, max_value=100000000.0, step=0.1)
+    min_area = st.number_input("Minimum area m²", min_value=0, max_value=270, value = 15, step=0)
 
 with col3:
-    max_value = st.number_input("Maximum value", min_value=0.0, max_value=100000000.0, step=0.1)
+    min_year = st.number_input("Minimum year built", min_value=1960, max_value=2024, step=1)
 
 st.markdown('''
 
 ''')
 
+# Apply filter
+listings_df = listings_df[listings_df["price_man_yen"] <= max_price]
+listings_df = listings_df[listings_df["area_sqm"] >= min_area]
+listings_df = listings_df[listings_df["year_built"] >= min_year]
 
 # Text embedding
 text_embedding = get_text_embeddings(model, processor, [query])
@@ -73,18 +88,10 @@ else:
     source_id = similarity.nlargest(n=10, columns=["embedding"])["source_id"]
     listings = listings_df[listings_df["source_id"].isin(source_id)]
 
-
+listings = listings.reset_index().drop(columns="index")
 
 # implement map
-df = pd.DataFrame({
-    "lon": listings["longitude"],
-    "lat": listings["latitude"]
-})
-
 st.write(f"Nr of listings : {len(listings)}")
-
-#st.map(df)
-
 
 # Create the map with hover data
 fig = px.scatter_mapbox(
@@ -96,6 +103,7 @@ fig = px.scatter_mapbox(
     zoom=10,
     height=400,
     mapbox_style="carto-positron",
+    color = "deal",
     size = "price_man_yen",
     size_max=10,
 )
@@ -112,10 +120,11 @@ st.plotly_chart(fig, use_container_width=True)
 ## Listings
 
 '''
-'''
-### Show Good Deals only?
-'''
-show_all = st.selectbox("", ["Show all", "Good Deal only"])
+show_all = st.selectbox("Show Good Deals only?", ["Show all", "Good Deal only"])
+
+if show_all == "Good Deal only":
+    listings = listings[listings["deal"] == "Good Deal"]
+    listings = listings.reset_index().drop(columns="index")
 
 # --- Card Styling ---
 st.markdown("""
@@ -133,15 +142,42 @@ st.markdown("""
     overflow: hidden;
     border-radius: 10px;
 }
-
 .image-container img {
     width: 100%;
     height: 100%;
     object-fit: cover;
 }
+.address-overlay {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: rgba(0,0,0,0.6);
+    color: white;
+    padding: 4px 8px;
+    font-size: 13px;
+    border-radius: 6px;
+}
+.container {
+  display: flex; /* Makes the container a flex container */
+  gap: 20px; /* Adds space between columns */
+}
+
+.column {
+  padding: 15px;
+}
+.left {
+    width: 70%; /* Sets the width of the first column */
+}
+
+.right {
+    width: 30%; /* Sets the width of the second column */
+}
 .price {
     font-size: 22px;
     font-weight: bold;
+}
+.logo img {
+    height: 60px;
 }
 .meta {
     color: #555;
@@ -155,9 +191,16 @@ cols = st.columns(3)
 
 for i, row in listings.iterrows():
 
+    logo_html = (
+        f'<img src="data:image/png;base64,{logo_base64}">'
+        if row.get("deal") == "Good Deal"
+        else '<div class="meta"></div>'
+    )
+
     col = cols[i % 3]
 
     with col:
+
         st.markdown('<div class="card">', unsafe_allow_html=True)
 
         if pd.notna(row.get("image_url")):
@@ -165,6 +208,7 @@ for i, row in listings.iterrows():
                 f"""
                 <div class="image-container">
                     <img src="{row['image_url']}">
+                    <div class="address-overlay">{row.get('address','')}</div>
                 </div>
                 """,
                 unsafe_allow_html=True
@@ -172,9 +216,19 @@ for i, row in listings.iterrows():
 
         st.markdown(
             f"""
-            <div class="price">{row.get('price_man_yen','')} 万円</div>
-            <div class="meta">{row.get('area_sqm','')} m²</div>
-            <div>{row.get('address','')}</div>
+            <div class="container">
+                <div class="column left">
+                    <div class="price">{row.get('price_man_yen','')} 万円</div>
+                    <div class="meta">{row.get('predicted_price','')} 万円 (predicted)</div>
+                    <div class="meta">{row.get('area_sqm','')} m²</div>
+                    <div class="meta">{row.get('walk_minutes','')} min to {row.get('nearest_station','')}</div>
+                </div>
+                <div class="column right">
+                    <div class="logo">
+                        {logo_html}
+                    </div>
+                </div>
+            </div>
             """,
             unsafe_allow_html=True
         )

@@ -331,11 +331,13 @@ def pred(
     assert model is not None
 
     # Load the preprocessor
-    filename = data_path / "data_dump/preprocessor.sav"
+    filename = data_path / "data_dump/preprocessor.pkl"
     with open(filename, 'rb') as file:
         preprocessor = pickle.load(file)
 
-    X_processed = preprocessor.transform(X_new)
+    #X_processed = preprocessor.transform(X_new)
+    X_processed = pd.DataFrame(preprocessor.transform(X_new), columns=preprocessor.get_feature_names_out(), index=X_new.index)
+
     y_pred = model.predict(X_processed)
 
     print("\n✅ prediction done: ", y_pred, y_pred.shape, "\n")
@@ -348,12 +350,12 @@ def add_prediction(path_to_project: str):
     data_path = pathlib.Path(path_to_project)
 
     # import listings.csv
-    listings_df = pd.read_csv(data_path / "data_dump/listings_with_avg_income.csv")
+    listings_df = pd.read_csv(data_path / "data_dump/listings_with_buildings.csv")
     X = listings_df.drop(columns=["price_man_yen"]).copy()
     y = listings_df["price_man_yen"]
 
     # initialize clip
-    y_pred = pred(path_to_project, X)
+    y_pred = np.round(np.expm1(pred(path_to_project, X)),0)
 
     listings_df["predicted_price"] = y_pred
 
@@ -361,11 +363,11 @@ def add_prediction(path_to_project: str):
 
     # save csv
     os.makedirs("data_dump", exist_ok=True)
-    file_exists = os.path.isfile(data_path / "data_dump/listings_with_scores_pred.csv")
+    file_exists = os.path.isfile(data_path / "data_dump/listings_with_pred.csv")
     if file_exists:
-        listings_df.to_csv(data_path / "data_dump/listings_with_scores_pred.csv", mode = "a", header=False, index=False)
+        listings_df.to_csv(data_path / "data_dump/listings_with_pred.csv", mode = "a", header=False, index=False)
     else:
-        listings_df.to_csv(data_path / "data_dump/listings_with_scores_pred.csv", index = False)
+        listings_df.to_csv(data_path / "data_dump/listings_with_pred.csv", index = False)
 
 
     return listings_df
